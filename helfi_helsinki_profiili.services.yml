@@ -1,0 +1,4 @@
+services:
+  helfi_helsinki_profiili.userdata:
+    class: Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData
+    arguments: ['@openid_connect.session', '@http_client', '@logger.factory', '@current_user']

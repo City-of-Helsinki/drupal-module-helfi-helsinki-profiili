@@ -1,0 +1,20 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the Helsinki-profiili module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function helfi_helsinki_profiili_install() {
+  \Drupal::messenger()->addStatus(__FUNCTION__);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function helfi_helsinki_profiili_uninstall() {
+  \Drupal::messenger()->addStatus(__FUNCTION__);
+}
