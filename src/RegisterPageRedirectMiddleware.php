@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 /**
- * RegisterPageRedirectMiddleware middleware.
+ * Prevent access to user/register & user/password urls and redirect.
  */
 class RegisterPageRedirectMiddleware implements HttpKernelInterface {
 
@@ -20,8 +20,13 @@ class RegisterPageRedirectMiddleware implements HttpKernelInterface {
    *
    * @var \Symfony\Component\HttpKernel\HttpKernelInterface
    */
-  protected $httpKernel;
+  protected HttpKernelInterface $httpKernel;
 
+  /**
+   * Show messages to users.
+   *
+   * @var \Drupal\Core\Messenger\Messenger
+   */
   protected Messenger $messenger;
 
   /**
@@ -29,6 +34,8 @@ class RegisterPageRedirectMiddleware implements HttpKernelInterface {
    *
    * @param \Symfony\Component\HttpKernel\HttpKernelInterface $http_kernel
    *   The decorated kernel.
+   * @param \Drupal\Core\Messenger\Messenger $messenger
+   *   Messenger service.
    */
   public function __construct(HttpKernelInterface $http_kernel, Messenger $messenger) {
     $this->httpKernel = $http_kernel;
