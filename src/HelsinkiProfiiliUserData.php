@@ -95,6 +95,7 @@ class HelsinkiProfiiliUserData {
    *
    * @return array
    *   User profile data.
+   *
    * @throws \GuzzleHttp\Exception\GuzzleException
    */
   public function getUserProfileData(): array {
