@@ -7,6 +7,8 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\openid_connect\OpenIDConnectSession;
 use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ServerException;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
@@ -150,12 +152,12 @@ class HelsinkiProfiiliUserData {
       }
 
     }
-    catch (GuzzleException $e) {
+    catch (ClientException | ServerException $e) {
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
         [
-          '%ecode' => $error['extensions']['code'],
-          '@error' => $error['message'],
+          '%ecode' => $e->getCode(),
+          '@error' => $e->getMessage(),
         ]
           );
     }
