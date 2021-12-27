@@ -5,9 +5,13 @@ namespace Drupal\helfi_helsinki_profiili;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\TempStore\PrivateTempStore;
+use Drupal\Core\TempStore\PrivateTempStoreFactory;
+use Drupal\Core\TempStore\TempStoreException;
 use Drupal\openid_connect\OpenIDConnectSession;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
 
 /**
@@ -51,6 +55,13 @@ class HelsinkiProfiiliUserData {
   protected AccountProxyInterface $currentUser;
 
   /**
+   * Access to session storage.
+   *
+   * @var \Drupal\Core\TempStore\PrivateTempStore
+   */
+  protected PrivateTempStore $tempStore;
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -61,25 +72,22 @@ class HelsinkiProfiiliUserData {
    *   The logger channel factory.
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
    *   Current user session.
+   * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $tempstore
+   *   Access session store.
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
     ClientInterface $http_client,
     LoggerChannelFactoryInterface $logger_factory,
-    AccountProxyInterface $currentUser) {
+    AccountProxyInterface $currentUser,
+    PrivateTempStoreFactory $tempstore) {
 
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
 
     $this->logger = $logger_factory->get('helsinki_profiili');
     $this->currentUser = $currentUser;
-
-    if ($this->isAuthenticatedExternally()) {
-      $this->userProfileData = $this->getUserProfileData();
-    }
-    else {
-      $this->userProfileData = [];
-    }
+    $this->tempStore = $tempstore->get('helsinki_profiili');
   }
 
   /**
@@ -97,29 +105,37 @@ class HelsinkiProfiiliUserData {
    *
    * @return array
    *   User profile data.
-   *
-   * @throws \GuzzleHttp\Exception\GuzzleException
    */
-  public function getUserProfileData(): array {
+  public function getUserProfileData(): ?array {
 
-    if (!empty($this->userProfileData)) {
-      return $this->userProfileData;
+    if ($this->isCached('myProfile')) {
+      return $this->getFromCache('myProfile');
     }
 
-    $endpoint = getenv('USERINFO_ENDPOINT');
+    // End point to access profile data.
+    $endpoint = getenv('USERINFO_PROFILE_ENDPOINT');
+    // Get query.
     $query = $this->graphqlQuery();
     $variables = [];
-    $token = $this->openidConnectSession->retrieveIdToken();
+    // Access token to get api access tokens in next step.
+    $accessToken = $this->openidConnectSession->retrieveAccessToken();
+    // Use access token to fetch profiili token from token service.
+    $apiAccessToken = $this->getHelsinkiProfiiliToken($accessToken);
 
     $headers = [
-      'Content-Type: application/json',
-      'User-Agent: Avustus2 dev application',
+      'Content-Type' => 'application/json',
     ];
-    if (NULL !== $token) {
-      $headers[] = "Authorization: bearer $token";
+    // Use api access token if set, if not, return NULL.
+    if (isset($apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'])) {
+      $headers["Authorization"] = "Bearer " . $apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'];
+    }
+    else {
+      // No point going further if no token is received.
+      return NULL;
     }
 
     try {
+      // Get profiili data with api access token.
       $response = $this->httpClient->request('POST', $endpoint, [
         'headers' => $headers,
         'json' => [
@@ -132,10 +148,8 @@ class HelsinkiProfiiliUserData {
       $body = Json::decode($json);
       $data = $body['data'];
 
-      // @todo fix graphql error reporting
       if (!empty($body['errors'])) {
         foreach ($body['errors'] as $error) {
-
           $this->logger->error(
             '/userinfo endpoint threw errorcode %ecode: @error',
             [
@@ -144,12 +158,16 @@ class HelsinkiProfiiliUserData {
             ]
           );
         }
+        return NULL;
       }
       else {
         $this->logger->notice('User %user got their HelsinkiProfiili data form endpoint', [
           '%user' => $this->currentUser->getDisplayName(),
         ]);
       }
+      // Set profile data to cache so that no need to fetch more data.
+      $this->setToCache('profile_data', $data);
+      return $data;
 
     }
     catch (ClientException | ServerException $e) {
@@ -161,21 +179,51 @@ class HelsinkiProfiiliUserData {
         ]
           );
     }
+    catch (TempStoreException $e) {
+      $this->logger->error(
+        'Caching userprofile data failed',
+        [
+          '%ecode' => $e->getCode(),
+          '@error' => $e->getMessage(),
+        ]
+          );
+    }
+    catch (GuzzleException $e) {
+    }
 
-    // @todo remove hardcoded myprofile data
-    $data = $this->demoData();
-
-    return Json::decode($data);
+    return NULL;
   }
 
   /**
-   * Get SSN from data structure.
+   * Fetch proper tokens from api-tokens endopoint.
    *
-   * @return mixed
-   *   User SSN.
+   * @param string $accessToken
+   *   Token from authorization service.
+   *
+   * @return array
+   *   Token data
    */
-  public function getSsn() {
-    return $this->userProfileData["myProfile"]["verifiedPersonalInformation"]["nationalIdentificationNumber"];
+  private function getHelsinkiProfiiliToken(string $accessToken): ?array {
+    try {
+      $response = $this->httpClient->request('GET', 'https://tunnistamo.test.hel.ninja/api-tokens/', [
+        'headers' => [
+          "Authorization" => "Bearer " . $accessToken,
+        ],
+      ]);
+      return Json::decode($response->getBody()->getContents());
+    }
+    catch (GuzzleException | \Exception $e) {
+      $this->logger->error(
+        'Error retrieving access token %ecode: @error',
+        [
+          '%ecode' => $e->getCode(),
+          '@error' => $e->getMessage(),
+        ]
+          );
+    }
+
+    return NULL;
+
   }
 
   /**
@@ -293,6 +341,50 @@ class HelsinkiProfiiliUserData {
       }
     }
     return $token;
+  }
+
+  /**
+   * Whether or not we have made this query?
+   *
+   * @param string $key
+   *   Used key for caching.
+   *
+   * @return bool
+   *   Is this cached?
+   */
+  private function isCached(string $key): bool {
+    $tempStoreData = $this->tempStore->get('helsinki_profiili');
+    return isset($tempStoreData[$key]) && !empty($tempStoreData[$key]);
+  }
+
+  /**
+   * Get item from cache.
+   *
+   * @param string $key
+   *   Key to fetch from tempstore.
+   *
+   * @return mixed|null
+   *   Data in cache or null
+   */
+  private function getFromCache(string $key) {
+    $tempStoreData = $this->tempStore->get('helsinki_profiili');
+    return (isset($tempStoreData[$key]) && !empty($tempStoreData[$key])) ? $tempStoreData[$key] : NULL;
+  }
+
+  /**
+   * Add item to cache.
+   *
+   * @param string $key
+   *   Used key for caching.
+   * @param array $data
+   *   Cached data.
+   *
+   * @throws \Drupal\Core\TempStore\TempStoreException
+   */
+  private function setToCache(string $key, array $data) {
+    $tempStoreData = $this->tempStore->get('helsinki_profiili');
+    $tempStoreData[$key] = $data;
+    $this->tempStore->set('helsinki_profiili', $data);
   }
 
   /**

@@ -8,3 +8,40 @@
  * This file is no longer required in Drupal 8.
  * @see https://www.drupal.org/node/2217931
  */
+
+use Drupal\user\UserInterface;
+
+/**
+ * OpenID Connect post authorize hook.
+ *
+ * This hook runs after a user has been authorized and claims have been mapped
+ * to the user's account.
+ *
+ * A popular use case for this hook is to saving token and additional identity
+ * provider related information to the user's Drupal session (private temp
+ * store).
+ *
+ * @param \Drupal\user\UserInterface $account
+ *   User account object of the authorized user.
+ * @param array $context
+ *   An associative array with context information:
+ *   - tokens:         An array of tokens.
+ *   - user_data:      An array of user and session data.
+ *   - userinfo:       An array of user information.
+ *   - plugin_id:      The plugin identifier.
+ *   - sub:            The remote user identifier.
+ *
+ * @ingroup openid_connect_api
+ */
+function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context) {
+
+  /** @var \Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData $profileDAO */
+  $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
+  try {
+    $data = $profileDAO->getUserProfileData();
+    \Drupal::messenger()->addStatus('User logged in and data fetched');
+  } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+    \Drupal::messenger()->addError('User profile data fetch failed');
+  }
+
+}
