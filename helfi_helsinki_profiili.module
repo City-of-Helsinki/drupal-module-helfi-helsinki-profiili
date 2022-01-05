@@ -9,6 +9,7 @@
  * @see https://www.drupal.org/node/2217931
  */
 
+use Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData;
 use Drupal\user\UserInterface;
 
 /**
@@ -35,7 +36,7 @@ use Drupal\user\UserInterface;
  */
 function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context) {
 
-  /** @var \Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData $profileDAO */
+  /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
   $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
   try {
     $data = $profileDAO->getUserProfileData();

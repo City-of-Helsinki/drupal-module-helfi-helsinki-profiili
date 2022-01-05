@@ -101,15 +101,36 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-   * Get user profile data from tunnistamo.
+   * Return parsed JWT token data from openid.
    *
    * @return array
+   *   Token data for authenticated user.
+   */
+  public function getTokenData(): array {
+    return $this->parseToken($this->openidConnectSession->retrieveIdToken());
+  }
+
+  /**
+   * Get user profile data from tunnistamo.
+   *
+   * @param bool $refetch
+   *   Non false value will bypass caching.
+   *
+   * @return array|null
    *   User profile data.
    */
-  public function getUserProfileData(): ?array {
+  public function getUserProfileData(bool $refetch = FALSE): ?array {
 
-    if ($this->isCached('myProfile')) {
-      return $this->getFromCache('myProfile');
+    // Access token to get api access tokens in next step.
+    $accessToken = $this->openidConnectSession->retrieveAccessToken();
+
+    if (!in_array('HelsinkiProfiili', $this->currentUser->getRoles()) && $accessToken == NULL) {
+      return NULL;
+    }
+
+    if ($refetch == FALSE && $this->isCached('myProfile')) {
+      $myProfile = $this->getFromCache('myProfile');
+      return $myProfile;
     }
 
     // End point to access profile data.
@@ -117,8 +138,7 @@ class HelsinkiProfiiliUserData {
     // Get query.
     $query = $this->graphqlQuery();
     $variables = [];
-    // Access token to get api access tokens in next step.
-    $accessToken = $this->openidConnectSession->retrieveAccessToken();
+
     // Use access token to fetch profiili token from token service.
     $apiAccessToken = $this->getHelsinkiProfiiliToken($accessToken);
 
@@ -329,10 +349,10 @@ class HelsinkiProfiiliUserData {
    * @param string $token
    *   The encoded ID token containing the user data.
    *
-   * @return array|string
+   * @return array
    *   The parsed JWT token or the original string.
    */
-  protected function parseToken(string $token) {
+  protected function parseToken(string $token): array {
     $parts = explode('.', $token, 3);
     if (count($parts) === 3) {
       $decoded = Json::decode(base64_decode($parts[1]));
@@ -340,7 +360,7 @@ class HelsinkiProfiiliUserData {
         return $decoded;
       }
     }
-    return $token;
+    return [];
   }
 
   /**
