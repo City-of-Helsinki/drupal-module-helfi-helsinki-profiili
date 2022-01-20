@@ -27,8 +27,7 @@ use Drupal\user\UserInterface;
  * @param array $context
  *   An associative array with context information:
  *   - tokens:         An array of tokens.
- *   - user_data:      An array of user and session data.
- *   - userinfo:       An array of user information.
+ *   - user_data:      An array of user and session data.*
  *   - plugin_id:      The plugin identifier.
  *   - sub:            The remote user identifier.
  *
@@ -39,6 +38,9 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
   /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
   $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
   try {
+    // set user data from openid
+    $profileDAO->setUserData($context['user_data']);
+    // fetch HelsinkiProfile data
     $data = $profileDAO->getUserProfileData();
     \Drupal::messenger()->addStatus('User logged in and data fetched');
   } catch (\GuzzleHttp\Exception\GuzzleException $e) {

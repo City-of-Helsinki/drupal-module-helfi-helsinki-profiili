@@ -8,6 +8,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\PrivateTempStore;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\TempStore\TempStoreException;
+use Drupal\helfi_helsinki_profiili\ProfileDataException;
 use Drupal\openid_connect\OpenIDConnectSession;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
@@ -76,11 +77,11 @@ class HelsinkiProfiiliUserData {
    *   Access session store.
    */
   public function __construct(
-    OpenIDConnectSession $openid_connect_session,
-    ClientInterface $http_client,
+    OpenIDConnectSession          $openid_connect_session,
+    ClientInterface               $http_client,
     LoggerChannelFactoryInterface $logger_factory,
-    AccountProxyInterface $currentUser,
-    PrivateTempStoreFactory $tempstore) {
+    AccountProxyInterface         $currentUser,
+    PrivateTempStoreFactory       $tempstore) {
 
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
@@ -110,6 +111,17 @@ class HelsinkiProfiiliUserData {
     return $this->parseToken($this->openidConnectSession->retrieveIdToken());
   }
 
+  public function setUserData($userData){
+    return $this->setToCache('userData', $userData);
+  }
+
+  public function getUserData() {
+    if ($this->isCached('userData')) {
+      return $this->getFromCache('userData');
+    }
+    else return NULL;
+  }
+
   /**
    * Get user profile data from tunnistamo.
    *
@@ -124,7 +136,8 @@ class HelsinkiProfiiliUserData {
     // Access token to get api access tokens in next step.
     $accessToken = $this->openidConnectSession->retrieveAccessToken();
 
-    if (!in_array('HelsinkiProfiili', $this->currentUser->getRoles()) && $accessToken == NULL) {
+
+    if (!in_array('helsinkiprofiili', $this->currentUser->getRoles()) && $accessToken == NULL) {
       return NULL;
     }
 
@@ -139,22 +152,23 @@ class HelsinkiProfiiliUserData {
     $query = $this->graphqlQuery();
     $variables = [];
 
-    // Use access token to fetch profiili token from token service.
-    $apiAccessToken = $this->getHelsinkiProfiiliToken($accessToken);
-
-    $headers = [
-      'Content-Type' => 'application/json',
-    ];
-    // Use api access token if set, if not, return NULL.
-    if (isset($apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'])) {
-      $headers["Authorization"] = "Bearer " . $apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'];
-    }
-    else {
-      // No point going further if no token is received.
-      return NULL;
-    }
-
     try {
+
+      // Use access token to fetch profiili token from token service.
+      $apiAccessToken = $this->getHelsinkiProfiiliToken($accessToken);
+
+      $headers = [
+        'Content-Type' => 'application/json',
+      ];
+      // Use api access token if set, if not, return NULL.
+      if (isset($apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'])) {
+        $headers["Authorization"] = "Bearer " . $apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'];
+      }
+      else {
+        // No point going further if no token is received.
+        return NULL;
+      }
+
       // Get profiili data with api access token.
       $response = $this->httpClient->request('POST', $endpoint, [
         'headers' => $headers,
@@ -186,29 +200,26 @@ class HelsinkiProfiiliUserData {
         ]);
       }
       // Set profile data to cache so that no need to fetch more data.
-      $this->setToCache('profile_data', $data);
+      $this->setToCache('myProfile', $data);
       return $data;
 
-    }
-    catch (ClientException | ServerException $e) {
+    } catch (ClientException|ServerException $e) {
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-          );
-    }
-    catch (TempStoreException $e) {
+      );
+    } catch (TempStoreException $e) {
       $this->logger->error(
         'Caching userprofile data failed',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-          );
-    }
-    catch (GuzzleException $e) {
+      );
+    } catch (GuzzleException $e) {
     }
 
     return NULL;
@@ -220,8 +231,9 @@ class HelsinkiProfiiliUserData {
    * @param string $accessToken
    *   Token from authorization service.
    *
-   * @return array
+   * @return array|null Token data
    *   Token data
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
   private function getHelsinkiProfiiliToken(string $accessToken): ?array {
     try {
@@ -230,20 +242,23 @@ class HelsinkiProfiiliUserData {
           "Authorization" => "Bearer " . $accessToken,
         ],
       ]);
-      return Json::decode($response->getBody()->getContents());
-    }
-    catch (GuzzleException | \Exception $e) {
+      $body = $response->getBody()->getContents();
+      $d = strlen($body);
+
+      if (strlen($body) < 5) {
+        throw new ProfileDataException('No data from profile endpoint');
+      }
+      return Json::decode($body);
+    } catch (GuzzleException|\Exception $e) {
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-          );
+      );
+      throw $e;
     }
-
-    return NULL;
-
   }
 
   /**
@@ -404,206 +419,7 @@ class HelsinkiProfiiliUserData {
   private function setToCache(string $key, array $data) {
     $tempStoreData = $this->tempStore->get('helsinki_profiili');
     $tempStoreData[$key] = $data;
-    $this->tempStore->set('helsinki_profiili', $data);
+    $this->tempStore->set('helsinki_profiili', $tempStoreData);
   }
-
-  /**
-   * Demo data for when the strong auth is broken.
-   *
-   * @return string
-   *   Profile data demo.
-   */
-  private function demoData(): string {
-
-    $this->logger->error(
-      'USERINFO USING DEMO DATA for %user',
-      [
-        '%user' => $this->currentUser->getDisplayName(),
-      ]
-    );
-
-    return '{
-      "myProfile": {
-          "id": "UHJvZmlsZU5vZGU6NzdhMjdhZmItMzQyNi00YTMyLTk0YjEtNzY5MWNiNjAxYmU5",
-          "firstName": "Mika",
-          "lastName": "Hietanen",
-          "nickname": "",
-          "language": "FINNISH",
-          "primaryAddress": {
-              "id": "QWRkcmVzc05vZGU6NzYxNg==",
-              "primary": true,
-              "address": "Vuorimiehenkatu 35",
-              "postalCode": "00100",
-              "city": "Helsinki",
-              "countryCode": "FI",
-              "addressType": "OTHER",
-              "__typename": "AddressNode"
-          },
-          "addresses": {
-              "edges": [
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "QWRkcmVzc05vZGU6NzYxOQ==",
-                          "address": "Mannerheimintie 37",
-                          "postalCode": "00250",
-                          "city": "Helsinki",
-                          "countryCode": "FI",
-                          "addressType": "OTHER",
-                          "__typename": "AddressNode"
-                      },
-                      "__typename": "AddressNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": true,
-                          "id": "QWRkcmVzc05vZGU6NzYxNg==",
-                          "address": "Vuorimiehenkatu 35",
-                          "postalCode": "00100",
-                          "city": "Helsinki",
-                          "countryCode": "FI",
-                          "addressType": "OTHER",
-                          "__typename": "AddressNode"
-                      },
-                      "__typename": "AddressNodeEdge"
-                  }
-              ],
-              "__typename": "AddressNodeConnection"
-          },
-          "primaryEmail": {
-              "id": "RW1haWxOb2RlOjgwNDQ=",
-              "email": "aman.yadav@anders.fi",
-              "primary": true,
-              "emailType": "NONE",
-              "__typename": "EmailNode"
-          },
-          "emails": {
-              "edges": [
-                  {
-                      "node": {
-                          "primary": true,
-                          "id": "RW1haWxOb2RlOjgwNDQ=",
-                          "email": "aman.yadav@anders.fi",
-                          "emailType": "NONE",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwNDI=",
-                          "email": "test@test.fi",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwNDA=",
-                          "email": "test@test.fi",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzk=",
-                          "email": "asdf@testi.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzg=",
-                          "email": "nizar.rahme@digia.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzc=",
-                          "email": "nizar.rahme@digia.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwNDE=",
-                          "email": "mika.hietanen@anders.fi",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzY=",
-                          "email": "test@test.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  }
-              ],
-              "__typename": "EmailNodeConnection"
-          },
-          "primaryPhone": {
-              "id": "UGhvbmVOb2RlOjgxNzE=",
-              "phone": "+358500555333",
-              "primary": true,
-              "phoneType": "OTHER",
-              "__typename": "PhoneNode"
-          },
-          "phones": {
-              "edges": [
-                  {
-                      "node": {
-                          "primary": true,
-                          "id": "UGhvbmVOb2RlOjgxNzE=",
-                          "phone": "+358500555333",
-                          "phoneType": "OTHER",
-                          "__typename": "PhoneNode"
-                      },
-                      "__typename": "PhoneNodeEdge"
-                  }
-              ],
-              "__typename": "PhoneNodeConnection"
-          },
-          "verifiedPersonalInformation": {
-              "firstName": "Nordea",
-              "lastName": "Demo",
-              "givenName": "Nordea",
-              "nationalIdentificationNumber": "210281-9988",
-              "municipalityOfResidence": "Turku",
-              "municipalityOfResidenceNumber": "853",
-              "permanentAddress": {
-                  "streetAddress": "Mansikkatie 11",
-                  "postalCode": "20006",
-                  "postOffice": "TURKU",
-                  "__typename": "VerifiedPersonalInformationAddressNode"
-              },
-              "temporaryAddress": null,
-              "permanentForeignAddress": null,
-              "__typename": "VerifiedPersonalInformationNode"
-          },
-          "__typename": "ProfileNode"
-      }
-    }';
-  }
-
+  
 }
