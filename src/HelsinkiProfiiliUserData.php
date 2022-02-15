@@ -143,6 +143,10 @@ class HelsinkiProfiiliUserData {
     // Access token to get api access tokens in next step.
     $accessToken = $this->openidConnectSession->retrieveAccessToken();
 
+    if ($accessToken == NULL) {
+      return NULL;
+    }
+
 //    if (!in_array('helsinkiprofiili', $this->currentUser->getRoles()) && $accessToken == NULL) {
 //      return NULL;
 //    }
