@@ -232,7 +232,11 @@ class HelsinkiProfiiliUserData {
         ]
           );
     }
-    catch (GuzzleException $e) {
+    catch (GuzzleException $e) {}
+    catch (ProfileDataException $e) {
+      $this->logger->error(
+        $e->getMessage()
+      );
     }
 
     return NULL;
