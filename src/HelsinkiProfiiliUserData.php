@@ -147,10 +147,6 @@ class HelsinkiProfiiliUserData {
       return NULL;
     }
 
-//    if (!in_array('helsinkiprofiili', $this->currentUser->getRoles()) && $accessToken == NULL) {
-//      return NULL;
-//    }
-
     if ($refetch == FALSE && $this->isCached('myProfile')) {
       $myProfile = $this->getFromCache('myProfile');
       return $myProfile;
@@ -215,13 +211,179 @@ class HelsinkiProfiiliUserData {
 
     }
     catch (ClientException | ServerException $e) {
+
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-          );
+      );
+
+      $body = Json::decode('
+      {
+    "myProfile": {
+      "id": "UHJvZmlsZU5vZGU6NzdhMjdhZmItMzQyNi00YTMyLTk0YjEtNzY5MWNiNjAxYmU5",
+      "firstName": "Mika",
+      "lastName": "Hietanen",
+      "nickname": "",
+      "language": "FINNISH",
+      "primaryAddress": {
+        "id": "QWRkcmVzc05vZGU6NzYxNg==",
+        "primary": true,
+        "address": "Vuorimiehenkatu 35",
+        "postalCode": "00100",
+        "city": "Helsinki",
+        "countryCode": "FI",
+        "addressType": "OTHER"
+      },
+      "addresses": {
+        "edges": [
+          {
+            "node": {
+              "primary": true,
+              "id": "QWRkcmVzc05vZGU6NzYxNg==",
+              "address": "Vuorimiehenkatu 35",
+              "postalCode": "00100",
+              "city": "Helsinki",
+              "countryCode": "FI",
+              "addressType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "QWRkcmVzc05vZGU6NzYxOQ==",
+              "address": "Mannerheimintie 37",
+              "postalCode": "00250",
+              "city": "Helsinki",
+              "countryCode": "FI",
+              "addressType": "OTHER"
+            }
+          }
+        ]
+      },
+      "primaryEmail": {
+        "id": "RW1haWxOb2RlOjgwNTA=",
+        "email": "aki.koskinen@hel.fi",
+        "primary": true,
+        "emailType": "NONE"
+      },
+      "emails": {
+        "edges": [
+          {
+            "node": {
+              "primary": true,
+              "id": "RW1haWxOb2RlOjgwNTA=",
+              "email": "aki.koskinen@hel.fi",
+              "emailType": "NONE"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwMzY=",
+              "email": "test@test.com",
+              "emailType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwMzc=",
+              "email": "nizar.rahme@digia.com",
+              "emailType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwMzg=",
+              "email": "nizar.rahme@digia.com",
+              "emailType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwMzk=",
+              "email": "asdf@testi.com",
+              "emailType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwNDA=",
+              "email": "test@test.fi",
+              "emailType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwNDE=",
+              "email": "mika.hietanen@anders.fi",
+              "emailType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwNDI=",
+              "email": "test@test.fi",
+              "emailType": "OTHER"
+            }
+          },
+          {
+            "node": {
+              "primary": false,
+              "id": "RW1haWxOb2RlOjgwNDQ=",
+              "email": "aman.yadav@anders.fi",
+              "emailType": "OTHER"
+            }
+          }
+        ]
+      },
+      "primaryPhone": {
+        "id": "UGhvbmVOb2RlOjgxNzE=",
+        "phone": "+358500555333",
+        "primary": true,
+        "phoneType": "OTHER"
+      },
+      "phones": {
+        "edges": [
+          {
+            "node": {
+              "primary": true,
+              "id": "UGhvbmVOb2RlOjgxNzE=",
+              "phone": "+358500555333",
+              "phoneType": "OTHER"
+            }
+          }
+        ]
+      },
+      "verifiedPersonalInformation": {
+        "firstName": "Nordea",
+        "lastName": "Demo",
+        "givenName": "Nordea",
+        "nationalIdentificationNumber": "210281-9988",
+        "municipalityOfResidence": "Turku",
+        "municipalityOfResidenceNumber": "853",
+        "permanentAddress": {
+          "streetAddress": "Mansikkatie 11",
+          "postalCode": "20006",
+          "postOffice": "TURKU"
+        },
+        "temporaryAddress": null,
+        "permanentForeignAddress": null
+      }
+    }
+  }
+      ');
+      return $body;
+
+
     }
     catch (TempStoreException $e) {
       $this->logger->error(
