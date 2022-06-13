@@ -9,6 +9,7 @@ use Drupal\Core\TempStore\PrivateTempStore;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\openid_connect\OpenIDConnectSession;
+use Exception;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -101,6 +102,29 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
+   * Get user authentication level from suomifi / helsinkiprofile.
+   *
+   * @todo When auth levels are set in HP, check that these match.
+   *
+   * @return string
+   *   Authentication level to be tested.
+   */
+  public function getAuthenticationLevel(): string {
+    $authLevel = 'noAuth';
+
+    $userData = $this->getUserData();
+
+    if ($userData['loa'] == 'substantial') {
+      return 'strong';
+    }
+    if ($userData['loa'] == 'low') {
+      return 'weak';
+    }
+
+    return $authLevel;
+  }
+
+  /**
    * Return parsed JWT token data from openid.
    *
    * @return array
@@ -141,16 +165,15 @@ class HelsinkiProfiiliUserData {
   public function getUserProfileData(bool $refetch = FALSE): ?array {
 
     // Access token to get api access tokens in next step.
-    $accessToken = $this->openidConnectSession->retrieveAccessToken();
+    $accessToken = $this->getAccessToken();
 
     if ($accessToken == NULL) {
       return NULL;
     }
 
-//    if (!in_array('helsinkiprofiili', $this->currentUser->getRoles()) && $accessToken == NULL) {
-//      return NULL;
-//    }
-
+    // If (!in_array('helsinkiprofiili', $this->currentUser->getRoles()) && $accessToken == NULL) {
+    //      return NULL;
+    //    }.
     if ($refetch == FALSE && $this->isCached('myProfile')) {
       $myProfile = $this->getFromCache('myProfile');
       return $myProfile;
@@ -232,7 +255,8 @@ class HelsinkiProfiiliUserData {
         ]
           );
     }
-    catch (GuzzleException $e) {}
+    catch (GuzzleException $e) {
+    }
     catch (ProfileDataException $e) {
       $this->logger->error(
         $e->getMessage()
@@ -253,9 +277,9 @@ class HelsinkiProfiiliUserData {
    *
    * @throws \GuzzleHttp\Exception\GuzzleException
    */
-  private function getHelsinkiProfiiliToken(string $accessToken): ?array {
+  public function getHelsinkiProfiiliToken(string $accessToken): ?array {
     try {
-      $response = $this->httpClient->request('GET', 'https://tunnistamo.test.hel.ninja/api-tokens/', [
+      $response = $this->httpClient->request('GET', getenv('USERINFO_TOKEN_ENDPOINT'), [
         'headers' => [
           "Authorization" => "Bearer " . $accessToken,
         ],
@@ -267,7 +291,7 @@ class HelsinkiProfiiliUserData {
       }
       return Json::decode($body);
     }
-    catch (GuzzleException | \Exception $e) {
+    catch (GuzzleException | Exception $e) {
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
@@ -438,6 +462,16 @@ class HelsinkiProfiiliUserData {
     $tempStoreData = $this->tempStore->get('helsinki_profiili');
     $tempStoreData[$key] = $data;
     $this->tempStore->set('helsinki_profiili', $tempStoreData);
+  }
+
+  /**
+   * Get access token from oidc.
+   *
+   * @return string|null
+   *   Access token or null.
+   */
+  public function getAccessToken(): ?string {
+    return $this->openidConnectSession->retrieveAccessToken();
   }
 
 }
