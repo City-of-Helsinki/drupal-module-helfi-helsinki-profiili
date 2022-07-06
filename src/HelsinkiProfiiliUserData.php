@@ -9,7 +9,6 @@ use Drupal\Core\TempStore\PrivateTempStore;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\openid_connect\OpenIDConnectSession;
-use Exception;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -113,6 +112,10 @@ class HelsinkiProfiiliUserData {
     $authLevel = 'noAuth';
 
     $userData = $this->getUserData();
+
+    if ($userData == NULL) {
+      return $authLevel;
+    }
 
     if ($userData['loa'] == 'substantial') {
       return 'strong';
@@ -224,6 +227,9 @@ class HelsinkiProfiiliUserData {
               '@error' => $error['message'],
             ]
           );
+
+          $this->logger->error('Endpoint: @endpoint', ['@endpoint' => $endpoint]);
+          $this->logger->error(Json::encode($headers));
         }
         return NULL;
       }
@@ -245,6 +251,10 @@ class HelsinkiProfiiliUserData {
           '@error' => $e->getMessage(),
         ]
           );
+
+      $this->logger->error('Endpoint: @endpoint', ['@endpoint' => $endpoint]);
+      $this->logger->error(Json::encode($headers));
+
     }
     catch (TempStoreException $e) {
       $this->logger->error(
@@ -291,7 +301,7 @@ class HelsinkiProfiiliUserData {
       }
       return Json::decode($body);
     }
-    catch (GuzzleException | Exception $e) {
+    catch (GuzzleException | \Exception $e) {
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
