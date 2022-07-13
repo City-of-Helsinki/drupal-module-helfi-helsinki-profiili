@@ -9,11 +9,9 @@
  * @see https://www.drupal.org/node/2217931
  */
 
-use Drupal\Core\Session\AccountInterface;
 use Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData;
 use Drupal\helfi_helsinki_profiili\ProfileDataException;
 use Drupal\user\UserInterface;
-use GuzzleHttp\Exception\GuzzleException;
 
 /**
  * OpenID Connect post authorize hook.
@@ -39,26 +37,26 @@ use GuzzleHttp\Exception\GuzzleException;
 function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context) {
 
   /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
-  $profileDAO = Drupal::service('helfi_helsinki_profiili.userdata');
+  $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
   try {
     // set user data from openid
     $profileDAO->setUserData($context['user_data']);
     // fetch HelsinkiProfile data
     try {
       $data = $profileDAO->getUserProfileData();
-      Drupal::messenger()->addStatus(t('User authenticated.'));
+
+      if ($data == NULL) {
+        \Drupal::messenger()->addWarning('User logged in, no profiledata found.');
+      } else {
+        \Drupal::messenger()->addStatus('User logged in and data fetched');
+      }
+
+
     } catch (ProfileDataException $e ) {
-      Drupal::messenger()->addStatus($e->getMessage());
+      \Drupal::messenger()->addStatus($e->getMessage());
     }
-  } catch (GuzzleException $e) {
-    Drupal::messenger()->addError('User profile data fetch failed');
+  } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+    \Drupal::messenger()->addError('User profile data fetch failed');
   }
-
-}
-
-/**
- * Implements hook_user_logout().
- */
-function helfi_helsinki_profiili_user_logout(AccountInterface $account) {
 
 }
