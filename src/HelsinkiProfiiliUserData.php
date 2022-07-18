@@ -9,7 +9,6 @@ use Drupal\Core\TempStore\PrivateTempStore;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\openid_connect\OpenIDConnectSession;
-use Exception;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -99,6 +98,33 @@ class HelsinkiProfiiliUserData {
    */
   public function isAuthenticatedExternally(): bool {
     return !($this->openidConnectSession->retrieveIdToken() === NULL);
+  }
+
+  /**
+   * Get user authentication level from suomifi / helsinkiprofile.
+   *
+   * @todo When auth levels are set in HP, check that these match.
+   *
+   * @return string
+   *   Authentication level to be tested.
+   */
+  public function getAuthenticationLevel(): string {
+    $authLevel = 'noAuth';
+
+    $userData = $this->getUserData();
+
+    if ($userData == NULL) {
+      return $authLevel;
+    }
+
+    if ($userData['loa'] == 'substantial') {
+      return 'strong';
+    }
+    if ($userData['loa'] == 'low') {
+      return 'weak';
+    }
+
+    return $authLevel;
   }
 
   /**
@@ -225,7 +251,6 @@ class HelsinkiProfiiliUserData {
       $body = $this->getFakeBody();
       return $body;
 
-
     }
     catch (TempStoreException $e) {
       $this->logger->error(
@@ -275,7 +300,7 @@ class HelsinkiProfiiliUserData {
       }
       return Json::decode($body);
     }
-    catch (GuzzleException | Exception $e) {
+    catch (GuzzleException | \Exception $e) {
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
@@ -449,7 +474,10 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
+   * Fake profiledata for when HP is not working.
+   *
    * @return mixed
+   *   Fake profile data.
    */
   protected function getFakeBody(): mixed {
     $body = Json::decode('
