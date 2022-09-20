@@ -46,17 +46,28 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
       $data = $profileDAO->getUserProfileData();
 
       if ($data == NULL) {
-        \Drupal::messenger()->addWarning('User logged in, no profiledata found.');
-      } else {
+        \Drupal::messenger()
+          ->addWarning('User logged in, no profiledata found.');
+      }
+      else {
         \Drupal::messenger()->addStatus('User logged in and data fetched');
       }
 
 
-    } catch (ProfileDataException $e ) {
+    } catch (ProfileDataException $e) {
       \Drupal::messenger()->addStatus($e->getMessage());
     }
   } catch (\GuzzleHttp\Exception\GuzzleException $e) {
     \Drupal::messenger()->addError('User profile data fetch failed');
   }
 
+}
+
+/**
+ * Implements hook_user_logout().
+ */
+function helfi_helsinki_profiili_user_logout(\Drupal\Core\Session\AccountProxyInterface $account) {
+  /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
+  $helsinkiProfiili = \Drupal::service('helfi_helsinki_profiili.userdata');
+  $helsinkiProfiili->clearCache();
 }
