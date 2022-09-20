@@ -7,3 +7,4 @@ Userdata is queried from graphql endpoint in Tunnistamo. Userdata is saved for r
 ## Environment
 
 USERINFO_ENDPOINT -> endpoint uri to /userinfo graphql endpoint
+

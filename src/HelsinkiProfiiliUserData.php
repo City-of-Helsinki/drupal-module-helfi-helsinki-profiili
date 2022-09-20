@@ -163,6 +163,25 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
+   * Get access tokens from helsinki profiili.
+   *
+   * @return array|null
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function getApiAccessTokens(){
+    // Access token to get api access tokens in next step.
+    $accessToken = $this->openidConnectSession->retrieveAccessToken();
+
+    if ($accessToken == NULL) {
+      return NULL;
+    }
+
+    // Use access token to fetch profiili token from token service.
+    return $this->getHelsinkiProfiiliToken($accessToken);
+
+  }
+
+  /**
    * Get user profile data from tunnistamo.
    *
    * @param bool $refetch
