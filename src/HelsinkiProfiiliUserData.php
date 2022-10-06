@@ -326,7 +326,7 @@ class HelsinkiProfiiliUserData {
           '@error' => $e->getMessage(),
         ]
       );
-      throw $e;
+      throw new TokenExpiredException($e->getMessage());
     }
   }
 
