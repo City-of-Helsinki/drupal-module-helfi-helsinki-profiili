@@ -36,6 +36,26 @@ use Drupal\user\UserInterface;
  */
 function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context) {
 
+
+  // Remove all existing roles.
+  array_map(
+    fn (string $rid) => $account->removeRole($rid),
+    $account->getRoles(FALSE)
+  );
+
+  try {
+    // add strong auth for strong auth and weak for other.
+    // @todo: this will need to change when we actually see what the difference here is.
+    if ($context["user_data"]["loa"] == 'substantial') {
+      $account->addRole(getenv('HP_USER_ROLE_STRONG'));
+    } else {
+      $account->addRole(getenv('HP_USER_ROLE_WEAK'));
+    }
+    $account->save();
+  } catch (\Drupal\Core\Entity\EntityStorageException $e) {
+    $d = 'adsf';
+  }
+
   /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
   $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
   try {

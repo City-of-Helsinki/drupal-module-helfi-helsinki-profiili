@@ -62,6 +62,21 @@ class HelsinkiProfiiliUserData {
   protected PrivateTempStore $tempStore;
 
   /**
+   * Store user roles for helsinki profile users.
+   *
+   * @var array $hp_user_roles
+   */
+  protected array $hp_user_roles;
+
+  /**
+   * User roles for form administration.
+   *
+   * @var array $hp_admin_roles
+   */
+  protected array $hp_admin_roles;
+
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -74,6 +89,8 @@ class HelsinkiProfiiliUserData {
    *   Current user session.
    * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $tempstore
    *   Access session store.
+   *
+   * @throws \Drupal\helfi_helsinki_profiili\ProfileDataException
    */
   public function __construct(
     OpenIDConnectSession          $openid_connect_session,
@@ -88,6 +105,19 @@ class HelsinkiProfiiliUserData {
     $this->logger = $logger_factory->get('helsinki_profiili');
     $this->currentUser = $currentUser;
     $this->tempStore = $tempstore->get('helsinki_profiili');
+
+    $hp_role_string = getenv('HP_USER_ROLES');
+    if (!empty($hp_role_string)) {
+      $this->hp_user_roles = explode(',', $hp_role_string);
+    } else {
+      throw new ProfileDataException('Missing user roles.');
+    }
+    $admin_role_string = getenv('ADMIN_USER_ROLES');
+    if (!empty($admin_role_string)) {
+      $this->hp_admin_roles = explode(',', $admin_role_string);
+    } else {
+      throw new ProfileDataException('Missing admin roles.');
+    }
   }
 
   /**
@@ -514,6 +544,31 @@ class HelsinkiProfiiliUserData {
     $tempStoreData = $this->tempStore->get('helsinki_profiili');
     $tempStoreData[$key] = $data;
     $this->tempStore->set('helsinki_profiili', $tempStoreData);
+  }
+
+  /**
+   * @return \Drupal\Core\Session\AccountProxyInterface
+   */
+  public function getCurrentUser(): AccountProxyInterface {
+    return $this->currentUser;
+  }
+
+  /**
+   * Get user roles that have helsinki profile authentication.
+   *
+   * @return array
+   */
+  public function getHpUserRoles(): array {
+    return $this->hp_user_roles;
+  }
+
+  /**
+   * Get admin roles.
+   *
+   * @return array
+   */
+  public function getAdminRoles(): array {
+    return $this->hp_admin_roles;
   }
 
 }
