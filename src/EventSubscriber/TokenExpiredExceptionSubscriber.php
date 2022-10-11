@@ -7,8 +7,6 @@ use Drupal\Core\Url;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
-use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
-use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
@@ -41,7 +39,7 @@ class TokenExpiredExceptionSubscriber implements EventSubscriberInterface {
    */
   public function onKernelException(ExceptionEvent $event) {
     $exception = $event->getThrowable();
-    if(get_class($exception) == 'Drupal\helfi_helsinki_profiili\TokenExpiredException') {
+    if (get_class($exception) == 'Drupal\helfi_helsinki_profiili\TokenExpiredException') {
       user_logout();
       $this->messenger->addError('Session timeout, please relogin');
       $url = Url::fromRoute('<front>');

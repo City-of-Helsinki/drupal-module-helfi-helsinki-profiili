@@ -9,7 +9,9 @@
  * @see https://www.drupal.org/node/2217931
  */
 
-use Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData;
+use Drupal\Core\Session\AccountProxyInterface;
+use GuzzleHttp\Exception\GuzzleException;
+use Drupal\Core\Entity\EntityStorageException;
 use Drupal\helfi_helsinki_profiili\ProfileDataException;
 use Drupal\user\UserInterface;
 
@@ -36,7 +38,6 @@ use Drupal\user\UserInterface;
  */
 function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context) {
 
-
   // Remove all existing roles.
   array_map(
     fn (string $rid) => $account->removeRole($rid),
@@ -44,24 +45,35 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
   );
 
   try {
-    // add strong auth for strong auth and weak for other.
-    // @todo: this will need to change when we actually see what the difference here is.
-    if ($context["user_data"]["loa"] == 'substantial') {
-      $account->addRole(getenv('HP_USER_ROLE_STRONG'));
-    } else {
-      $account->addRole(getenv('HP_USER_ROLE_WEAK'));
+    if ($context["plugin_id"] == getenv('HP_USER_CLIENT')) {
+      // Add strong auth for strong auth and weak for other.
+      // @todo this will need to change when we actually see what the difference here is.
+      if ($context["user_data"]["loa"] == 'substantial') {
+        $account->addRole(getenv('HP_USER_ROLE_STRONG'));
+      }
+      else {
+        $account->addRole(getenv('HP_USER_ROLE_WEAK'));
+      }
     }
+    elseif ($context["plugin_id"] == getenv('HP_ADMIN_CLIENT')) {
+      // Add admin roles for admin client logins.
+      array_map(
+        fn(string $rid) => $account->addRole($rid),
+        explode(',', getenv('ADMIN_USER_ROLES'))
+      );
+    }
+
     $account->save();
-  } catch (\Drupal\Core\Entity\EntityStorageException $e) {
-    $d = 'adsf';
+  }
+  catch (EntityStorageException $e) {
   }
 
   /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
   $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
   try {
-    // set user data from openid
+    // Set user data from openid.
     $profileDAO->setUserData($context['user_data']);
-    // fetch HelsinkiProfile data
+    // Fetch HelsinkiProfile data.
     try {
       $data = $profileDAO->getUserProfileData();
 
@@ -73,11 +85,12 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
         \Drupal::messenger()->addStatus('User logged in and data fetched');
       }
 
-
-    } catch (ProfileDataException $e) {
+    }
+    catch (ProfileDataException $e) {
       \Drupal::messenger()->addStatus($e->getMessage());
     }
-  } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+  }
+  catch (GuzzleException $e) {
     \Drupal::messenger()->addError('User profile data fetch failed');
   }
 
@@ -86,7 +99,7 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
 /**
  * Implements hook_user_logout().
  */
-function helfi_helsinki_profiili_user_logout(\Drupal\Core\Session\AccountProxyInterface $account) {
+function helfi_helsinki_profiili_user_logout(AccountProxyInterface $account) {
   /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
   $helsinkiProfiili = \Drupal::service('helfi_helsinki_profiili.userdata');
   $helsinkiProfiili->clearCache();

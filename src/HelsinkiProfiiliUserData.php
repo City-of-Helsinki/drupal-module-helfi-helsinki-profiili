@@ -64,17 +64,16 @@ class HelsinkiProfiiliUserData {
   /**
    * Store user roles for helsinki profile users.
    *
-   * @var array $hp_user_roles
+   * @var array
    */
-  protected array $hp_user_roles;
+  protected array $hpUserRoles;
 
   /**
    * User roles for form administration.
    *
-   * @var array $hp_admin_roles
+   * @var array
    */
-  protected array $hp_admin_roles;
-
+  protected array $hpAdminRoles;
 
   /**
    * Constructs a HelsinkiProfiiliUser object.
@@ -93,11 +92,11 @@ class HelsinkiProfiiliUserData {
    * @throws \Drupal\helfi_helsinki_profiili\ProfileDataException
    */
   public function __construct(
-    OpenIDConnectSession          $openid_connect_session,
-    ClientInterface               $http_client,
+    OpenIDConnectSession $openid_connect_session,
+    ClientInterface $http_client,
     LoggerChannelFactoryInterface $logger_factory,
-    AccountProxyInterface         $currentUser,
-    PrivateTempStoreFactory       $tempstore) {
+    AccountProxyInterface $currentUser,
+    PrivateTempStoreFactory $tempstore) {
 
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
@@ -108,14 +107,16 @@ class HelsinkiProfiiliUserData {
 
     $hp_role_string = getenv('HP_USER_ROLES');
     if (!empty($hp_role_string)) {
-      $this->hp_user_roles = explode(',', $hp_role_string);
-    } else {
+      $this->hpUserRoles = explode(',', $hp_role_string);
+    }
+    else {
       throw new ProfileDataException('Missing user roles.');
     }
     $admin_role_string = getenv('ADMIN_USER_ROLES');
     if (!empty($admin_role_string)) {
-      $this->hp_admin_roles = explode(',', $admin_role_string);
-    } else {
+      $this->hpAdminRoles = explode(',', $admin_role_string);
+    }
+    else {
       throw new ProfileDataException('Missing admin roles.');
     }
   }
@@ -135,8 +136,8 @@ class HelsinkiProfiiliUserData {
    *
    * @return string
    *   Authentication level to be tested.
-   * @todo When auth levels are set in HP, check that these match.
    *
+   * @todo When auth levels are set in HP, check that these match.
    */
   public function getAuthenticationLevel(): string {
     $authLevel = 'noAuth';
@@ -196,9 +197,11 @@ class HelsinkiProfiiliUserData {
    * Get access tokens from helsinki profiili.
    *
    * @return array|null
+   *   Accesstokens or null.
+   *
    * @throws \GuzzleHttp\Exception\GuzzleException
    */
-  public function getApiAccessTokens(){
+  public function getApiAccessTokens() {
     // Access token to get api access tokens in next step.
     $accessToken = $this->openidConnectSession->retrieveAccessToken();
 
@@ -291,7 +294,8 @@ class HelsinkiProfiiliUserData {
       $this->setToCache('myProfile', $data);
       return $data;
 
-    } catch (ClientException|ServerException $e) {
+    }
+    catch (ClientException | ServerException $e) {
 
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
@@ -299,23 +303,26 @@ class HelsinkiProfiiliUserData {
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-      );
+          );
 
       return NULL;
 
-    } catch (TempStoreException $e) {
+    }
+    catch (TempStoreException $e) {
       $this->logger->error(
         'Caching userprofile data failed',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-      );
-    } catch (GuzzleException $e) {
-    } catch (ProfileDataException $e) {
+          );
+    }
+    catch (GuzzleException $e) {
+    }
+    catch (ProfileDataException $e) {
       $this->logger->error(
         $e->getMessage()
-      );
+          );
 
       return NULL;
 
@@ -330,10 +337,10 @@ class HelsinkiProfiiliUserData {
    * @param string $accessToken
    *   Token from authorization service.
    *
-   * @return array|null Token data
+   * @return array|null
    *   Token data
    *
-   * @throws \GuzzleHttp\Exception\GuzzleException
+   * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
    */
   private function getHelsinkiProfiiliToken(string $accessToken): ?array {
     try {
@@ -348,14 +355,15 @@ class HelsinkiProfiiliUserData {
         throw new ProfileDataException('No data from profile endpoint');
       }
       return Json::decode($body);
-    } catch (GuzzleException|\Exception $e) {
+    }
+    catch (GuzzleException | \Exception $e) {
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-      );
+          );
       throw new TokenExpiredException($e->getMessage());
     }
   }
@@ -511,7 +519,8 @@ class HelsinkiProfiiliUserData {
       }
 
       return TRUE;
-    } catch (\Exception $e) {
+    }
+    catch (\Exception $e) {
       return FALSE;
     }
   }
@@ -547,7 +556,10 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
+   * Get current user data.
+   *
    * @return \Drupal\Core\Session\AccountProxyInterface
+   *   Current user.
    */
   public function getCurrentUser(): AccountProxyInterface {
     return $this->currentUser;
@@ -557,18 +569,20 @@ class HelsinkiProfiiliUserData {
    * Get user roles that have helsinki profile authentication.
    *
    * @return array
+   *   Helsinki profiili user roles.
    */
   public function getHpUserRoles(): array {
-    return $this->hp_user_roles;
+    return $this->hpUserRoles;
   }
 
   /**
    * Get admin roles.
    *
    * @return array
+   *   Helsinki profiili admin roles.
    */
   public function getAdminRoles(): array {
-    return $this->hp_admin_roles;
+    return $this->hpAdminRoles;
   }
 
 }
