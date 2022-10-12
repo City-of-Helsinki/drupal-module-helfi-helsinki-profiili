@@ -117,7 +117,8 @@ class HelsinkiProfiiliUserData {
       $this->hpAdminRoles = explode(',', $admin_role_string);
     }
     else {
-      throw new ProfileDataException('Missing admin roles.');
+      $this->hpAdminRoles = [];
+//      throw new ProfileDataException('Missing admin roles.');
     }
   }
 
@@ -173,6 +174,8 @@ class HelsinkiProfiiliUserData {
    *
    * @var array $userData
    *  Userdata retrieved from HP.
+   *
+   * @throws \Drupal\Core\TempStore\TempStoreException
    */
   public function setUserData($userData) {
     return $this->setToCache('userData', $userData);
@@ -199,7 +202,7 @@ class HelsinkiProfiiliUserData {
    * @return array|null
    *   Accesstokens or null.
    *
-   * @throws \GuzzleHttp\Exception\GuzzleException
+   * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
    */
   public function getApiAccessTokens() {
     // Access token to get api access tokens in next step.
@@ -222,6 +225,7 @@ class HelsinkiProfiiliUserData {
    *
    * @return array|null
    *   User profile data.
+   * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
    */
   public function getUserProfileData(bool $refetch = FALSE): ?array {
 
