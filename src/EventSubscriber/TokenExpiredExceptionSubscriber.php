@@ -46,7 +46,6 @@ class TokenExpiredExceptionSubscriber implements EventSubscriberInterface {
       $response = new RedirectResponse($url->toString());
       $event->setResponse($response);
     }
-    $this->messenger->addStatus(__FUNCTION__);
   }
 
   /**

@@ -118,7 +118,7 @@ class HelsinkiProfiiliUserData {
     }
     else {
       $this->hpAdminRoles = [];
-//      throw new ProfileDataException('Missing admin roles.');
+      // Throw new ProfileDataException('Missing admin roles.');.
     }
   }
 
@@ -225,6 +225,7 @@ class HelsinkiProfiiliUserData {
    *
    * @return array|null
    *   User profile data.
+   *
    * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
    */
   public function getUserProfileData(bool $refetch = FALSE): ?array {
@@ -359,6 +360,10 @@ class HelsinkiProfiiliUserData {
         throw new ProfileDataException('No data from profile endpoint');
       }
       return Json::decode($body);
+    }
+    catch (ProfileDataException $profileDataException) {
+      $this->logger->error('Trying to get tokens from api-tokens endpoint, got empty body: @error', ['@error' => $profileDataException->getMessage()]);
+      return NULL;
     }
     catch (GuzzleException | \Exception $e) {
       $this->logger->error(
