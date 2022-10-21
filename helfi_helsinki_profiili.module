@@ -44,22 +44,26 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
     $account->getRoles(FALSE)
   );
 
+  $config = \Drupal::config('helfi_helsinki_profiili.settings');
+  $rolesConfig = $config->get('roles');
+  $clientsConfig = $config->get('clients');
+
   try {
-    if ($context["plugin_id"] == getenv('HP_USER_CLIENT')) {
+    if ($context["plugin_id"] == $clientsConfig["hp_user_client"]) {
       // Add strong auth for strong auth and weak for other.
       // @todo this will need to change when we actually see what the difference here is.
       if ($context["user_data"]["loa"] == 'substantial') {
-        $account->addRole(getenv('HP_USER_ROLE_STRONG'));
+        $account->addRole($rolesConfig["hp_user_role_strong"]);
       }
       else {
-        $account->addRole(getenv('HP_USER_ROLE_WEAK'));
+        $account->addRole($rolesConfig["hp_user_role_weak"]);
       }
     }
-    elseif ($context["plugin_id"] == getenv('HP_ADMIN_CLIENT')) {
+    elseif ($context["plugin_id"] == $clientsConfig["hp_admin_client"]) {
       // Add admin roles for admin client logins.
       array_map(
         fn(string $rid) => $account->addRole($rid),
-        explode(',', getenv('ADMIN_USER_ROLES'))
+        $rolesConfig["admin_user_roles"]
       );
     }
 
