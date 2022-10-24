@@ -112,7 +112,8 @@ class HelsinkiProfiiliUserData {
       $this->hpUserRoles = $rolesConfig['hp_user_roles'];
     }
     else {
-      throw new ProfileDataException('Missing user roles.');
+      $this->hpUserRoles = [];
+//      throw new ProfileDataException('Missing user roles.');
     }
     if ($rolesConfig['admin_user_roles']) {
       $this->hpAdminRoles = $rolesConfig['admin_user_roles'];
