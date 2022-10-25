@@ -114,7 +114,7 @@ class HelsinkiProfiiliUserData {
     else {
       $this->hpUserRoles = [];
     }
-    if (empty($rolesConfig['admin_user_roles'])) {
+    if (!empty($rolesConfig['admin_user_roles'])) {
       $this->hpAdminRoles = $rolesConfig['admin_user_roles'];
     }
     else {
