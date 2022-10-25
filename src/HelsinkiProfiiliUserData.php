@@ -108,14 +108,13 @@ class HelsinkiProfiiliUserData {
     $config = \Drupal::config('helfi_helsinki_profiili.settings');
     $rolesConfig = $config->get('roles');
 
-    if ($rolesConfig['hp_user_roles']) {
+    if (!empty($rolesConfig['hp_user_roles'])) {
       $this->hpUserRoles = $rolesConfig['hp_user_roles'];
     }
     else {
       $this->hpUserRoles = [];
-//      throw new ProfileDataException('Missing user roles.');
     }
-    if ($rolesConfig['admin_user_roles']) {
+    if (empty($rolesConfig['admin_user_roles'])) {
       $this->hpAdminRoles = $rolesConfig['admin_user_roles'];
     }
     else {
@@ -522,7 +521,9 @@ class HelsinkiProfiiliUserData {
 
     try {
       if ($key == '') {
-        $this->tempStore->deleteAllUser();
+        if (method_exists($this->tempStore, 'deleteAllUser')) {
+          $this->tempStore->deleteAllUser();
+        }
       }
       else {
         $this->tempStore->delete($key);

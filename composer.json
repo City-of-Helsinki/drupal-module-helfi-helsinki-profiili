@@ -8,5 +8,14 @@
             "Drupal\\HelfiHelsinkiProfiili\\": "src/"
         }
     },
+    "extra": {
+        "composer-exit-on-patch-failure": true,
+        "enable-patching": true,
+        "patches": {
+            "drupal/core": {
+                "Add ability to delete all from tempstore": "https://www.drupal.org/files/issues/2020-10-23/get_delete_all_temp-2475719-31.patch"
+            }
+        }
+    },
     "require": {}
 }
