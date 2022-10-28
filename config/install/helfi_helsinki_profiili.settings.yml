@@ -1,9 +1,11 @@
 roles:
   hp_user_roles:
-    - 'helsinkiprofiili'
-  hp_user_role_strong: 'helsinkiprofiili'
-  hp_user_role_weak: ''
-  admin_user_roles: []
+    - 'helsinkiprofiili_vahva'
+    - 'helsinkiprofiili_heikko'
+  hp_user_role_strong: 'helsinkiprofiili_vahva'
+  hp_user_role_weak: 'helsinkiprofiili_heikko'
+  admin_user_roles:
+    - 'verkkolomake_hallinnoija'
 clients:
   hp_user_client: 'tunnistamo'
   hp_admin_client: 'tunnistamoadmin'
