@@ -3,6 +3,7 @@
 namespace Drupal\helfi_helsinki_profiili;
 
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\Xss;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\PrivateTempStore;
@@ -295,6 +296,17 @@ class HelsinkiProfiiliUserData {
           '%user' => $this->currentUser->getDisplayName(),
         ]);
       }
+      // Make sure that data coming from HP is sanitized and does not contain
+      // anything worth removing.
+      $cleaned = array_walk_recursive(
+        $data,
+        function (&$item) {
+          if (is_string($item)) {
+            $item = Xss::filter($item);
+          }
+        }
+      );
+
       // Set profile data to cache so that no need to fetch more data.
       $this->setToCache('myProfile', $data);
       return $data;
