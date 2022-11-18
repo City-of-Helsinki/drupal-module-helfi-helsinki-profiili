@@ -40,7 +40,7 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
 
   // Remove all existing roles.
   array_map(
-    fn (string $rid) => $account->removeRole($rid),
+    fn(string $rid) => $account->removeRole($rid),
     $account->getRoles(FALSE)
   );
 
@@ -59,43 +59,58 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
         $account->addRole($rolesConfig["hp_user_role_weak"]);
       }
     }
+    // user has used admin client for logging in
     elseif ($context["plugin_id"] == $clientsConfig["hp_admin_client"]) {
       // Add admin roles for admin client logins.
       array_map(
         fn(string $rid) => $account->addRole($rid),
         $rolesConfig["admin_user_roles"]
       );
+      if (isset($context["user_data"]["ad_groups"]) && !empty($context["user_data"]["ad_groups"])) {
+        // Get ad groups from config.
+        $adRoleMappings = $config->get('ad_role_mappings');
+        // Add mapped roles for users' ad groups.
+        array_map(
+          function ($adGroup) use ($account, $adRoleMappings) {
+            array_map(
+              fn(string $rid) => $account->addRole($rid),
+              $adRoleMappings[$adGroup] ?? []
+            );
+          },
+          $context["user_data"]["ad_groups"]
+        );
+      }
     }
 
     $account->save();
-  }
-  catch (EntityStorageException $e) {
+  } catch (EntityStorageException $e) {
   }
 
   /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
   $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
-  try {
-    // Set user data from openid.
-    $profileDAO->setUserData($context['user_data']);
-    // Fetch HelsinkiProfile data.
+
+  if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
     try {
-      $data = $profileDAO->getUserProfileData();
+      // Set user data from openid.
+      $profileDAO->setUserData($context['user_data']);
+      // Fetch HelsinkiProfile data.
+      try {
+        $data = $profileDAO->getUserProfileData();
 
-      if ($data == NULL) {
-        \Drupal::messenger()
-          ->addWarning('User logged in, no profiledata found.');
-      }
-      else {
-        \Drupal::messenger()->addStatus('User logged in and data fetched');
-      }
+        if ($data == NULL) {
+          \Drupal::messenger()
+            ->addWarning('User logged in, no profiledata found.');
+        }
+        else {
+          \Drupal::messenger()->addStatus('User logged in and data fetched');
+        }
 
+      } catch (ProfileDataException $e) {
+        \Drupal::messenger()->addStatus($e->getMessage());
+      }
+    } catch (GuzzleException $e) {
+      \Drupal::messenger()->addError('User profile data fetch failed');
     }
-    catch (ProfileDataException $e) {
-      \Drupal::messenger()->addStatus($e->getMessage());
-    }
-  }
-  catch (GuzzleException $e) {
-    \Drupal::messenger()->addError('User profile data fetch failed');
   }
 
 }
