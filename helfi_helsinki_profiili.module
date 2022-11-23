@@ -86,11 +86,10 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
   } catch (EntityStorageException $e) {
   }
 
-  /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
-  $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
-
   if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
     try {
+      /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
+      $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
       // Set user data from openid.
       $profileDAO->setUserData($context['user_data']);
       // Fetch HelsinkiProfile data.
