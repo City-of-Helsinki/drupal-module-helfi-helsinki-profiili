@@ -44,6 +44,9 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
     $account->getRoles(FALSE)
   );
 
+  // Save role deletion.
+  $account->save();
+
   $config = \Drupal::config('helfi_helsinki_profiili.settings');
   $rolesConfig = $config->get('roles');
   $clientsConfig = $config->get('clients');
