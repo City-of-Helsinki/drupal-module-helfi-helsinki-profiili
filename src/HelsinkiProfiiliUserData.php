@@ -9,16 +9,27 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\PrivateTempStore;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\TempStore\TempStoreException;
+use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\openid_connect\OpenIDConnectSession;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
+use Okta\JwtVerifier\Adaptors\FirebasePhpJwt;
+use Okta\JwtVerifier\Discovery\Oidc;
+use Okta\JwtVerifier\JwtVerifierBuilder;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
  */
 class HelsinkiProfiiliUserData {
+
+
+  public const TESTING_ENVIRONMENT = 'https://tunnistamo.test.hel.ninja';
+
+  public const STAGING_ENVIRONMENT = 'https://api.hel.fi/sso-test';
+
+  public const PRODUCTION_ENVIRONMENT = 'https://api.hel.fi/sso';
 
   /**
    * The openid_connect.session service.
@@ -77,6 +88,20 @@ class HelsinkiProfiiliUserData {
   protected array $hpAdminRoles;
 
   /**
+   * The environment resolver.
+   *
+   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
+   */
+  private EnvironmentResolverInterface $environmentResolver;
+
+  /**
+   * Store details about oidc issuer.
+   *
+   * @var array
+   */
+  private array $openIdConfiguration;
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -93,18 +118,22 @@ class HelsinkiProfiiliUserData {
    * @throws \Drupal\helfi_helsinki_profiili\ProfileDataException
    */
   public function __construct(
-    OpenIDConnectSession $openid_connect_session,
-    ClientInterface $http_client,
+    OpenIDConnectSession          $openid_connect_session,
+    ClientInterface               $http_client,
     LoggerChannelFactoryInterface $logger_factory,
-    AccountProxyInterface $currentUser,
-    PrivateTempStoreFactory $tempstore) {
+    AccountProxyInterface         $currentUser,
+    PrivateTempStoreFactory       $tempstore,
+    EnvironmentResolverInterface  $environmentResolver) {
 
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
+    $this->environmentResolver = $environmentResolver;
 
     $this->logger = $logger_factory->get('helsinki_profiili');
     $this->currentUser = $currentUser;
     $this->tempStore = $tempstore->get('helsinki_profiili');
+
+    $this->openIdConfiguration = [];
 
     $config = \Drupal::config('helfi_helsinki_profiili.settings');
     $rolesConfig = $config->get('roles');
@@ -121,6 +150,8 @@ class HelsinkiProfiiliUserData {
     else {
       $this->hpAdminRoles = [];
     }
+
+
   }
 
   /**
@@ -311,8 +342,7 @@ class HelsinkiProfiiliUserData {
       $this->setToCache('myProfile', $data);
       return $data;
 
-    }
-    catch (ClientException | ServerException $e) {
+    } catch (ClientException|ServerException $e) {
 
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
@@ -320,26 +350,23 @@ class HelsinkiProfiiliUserData {
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-          );
+      );
 
       return NULL;
 
-    }
-    catch (TempStoreException $e) {
+    } catch (TempStoreException $e) {
       $this->logger->error(
         'Caching userprofile data failed',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-          );
-    }
-    catch (GuzzleException $e) {
-    }
-    catch (ProfileDataException $e) {
+      );
+    } catch (GuzzleException $e) {
+    } catch (ProfileDataException $e) {
       $this->logger->error(
         $e->getMessage()
-          );
+      );
 
       return NULL;
 
@@ -372,19 +399,17 @@ class HelsinkiProfiiliUserData {
         throw new ProfileDataException('No data from profile endpoint');
       }
       return Json::decode($body);
-    }
-    catch (ProfileDataException $profileDataException) {
+    } catch (ProfileDataException $profileDataException) {
       $this->logger->error('Trying to get tokens from api-tokens endpoint, got empty body: @error', ['@error' => $profileDataException->getMessage()]);
       return NULL;
-    }
-    catch (GuzzleException | \Exception $e) {
+    } catch (GuzzleException|\Exception $e) {
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
           '%ecode' => $e->getCode(),
           '@error' => $e->getMessage(),
         ]
-          );
+      );
       throw new TokenExpiredException($e->getMessage());
     }
   }
@@ -495,7 +520,7 @@ class HelsinkiProfiiliUserData {
    * @return array
    *   The parsed JWT token or the original string.
    */
-  protected function parseToken(string $token): array {
+  public function parseToken(string $token): array {
     $parts = explode('.', $token, 3);
     if (count($parts) === 3) {
       $decoded = Json::decode(base64_decode($parts[1]));
@@ -542,8 +567,7 @@ class HelsinkiProfiiliUserData {
       }
 
       return TRUE;
-    }
-    catch (\Exception $e) {
+    } catch (\Exception $e) {
       return FALSE;
     }
   }
@@ -606,6 +630,135 @@ class HelsinkiProfiiliUserData {
    */
   public function getAdminRoles(): array {
     return $this->hpAdminRoles;
+  }
+
+  /**
+   * @param array $openIdConfiguration
+   */
+  public function setOpenIdConfiguration(array $openIdConfiguration): void {
+    $this->openIdConfiguration = $openIdConfiguration;
+  }
+
+  /**
+   * Get openid configurations.
+   *
+   * @return array
+   */
+  public function getOpenIdConfiguration(): array {
+    if (!$this->openIdConfiguration) {
+      $this->openIdConfiguration = $this->getOpenidConfigurationFromIssuer();
+    }
+    return $this->openIdConfiguration;
+  }
+
+
+  /**
+   * Get issuer configs from server.
+   *
+   * @return array
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function getOpenidConfigurationFromIssuer(): array {
+    $endpointMap = [
+      'local' => self::TESTING_ENVIRONMENT,
+      'dev' => self::TESTING_ENVIRONMENT,
+      'test' => self::TESTING_ENVIRONMENT,
+      'stage' => self::STAGING_ENVIRONMENT,
+      'prod' => self::PRODUCTION_ENVIRONMENT,
+    ];
+    $base = self::STAGING_ENVIRONMENT;
+
+    try {
+      // Attempt to automatically detect endpoint.
+      $env = $this->environmentResolver->getActiveEnvironmentName();
+
+      if (isset($endpointMap[$env])) {
+        $base = $endpointMap[$env];
+      }
+    } catch (\InvalidArgumentException) {
+    }
+
+    return Json::decode(
+      $this->httpClient->request(
+        'GET',
+        sprintf('%s/openid/.well-known/openid-configuration/', $base)
+      )->getBody()
+    );
+  }
+
+  public function getJwks() {
+    $data = [];
+    $config = $this->getOpenIdConfiguration();
+
+    $response = $this->httpClient->request(
+      'GET',
+      $config["jwks_uri"]
+    );
+
+    return Json::decode($response->getBody()->getContents());
+
+  }
+
+  /**
+   * @param $tokenString
+   *
+   * @return mixed
+   */
+  public function verifyJwtToken($tokenString) {
+
+//    $tokenData = $this->parseToken($tokenString);
+//
+//    $openIdConfig = $this->getOpenIdConfiguration();
+//    $jwksConfig = $this->getJwks();
+//
+//    $this->is_jwt_valid($tokenString,$jwksConfig);
+
+//    $jwtVerifier = (new JwtVerifierBuilder())
+//      ->setDiscovery(new Oidc()) // This is not needed if using oauth.  The other option is `new \Okta\JwtVerifier\Discovery\OIDC`
+//      ->setAdaptor(new FirebasePhpJwt())
+//      ->setAudience($tokenData["aud"])
+//      ->setClientId($jwksConfig)
+//      ->setIssuer($openIdConfig["issuer"])
+//      ->build();
+//
+//    $t = $jwtVerifier->verify($tokenString);
+
+    return 'asdf';
+  }
+
+function base64url_encode($data) {
+return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function base64url_decode($data) {
+return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
+}
+
+  function is_jwt_valid($jwt, $secret ) {
+    // split the jwt
+    $tokenParts = explode('.', $jwt);
+    $header = base64_decode($tokenParts[0]);
+    $payload = base64_decode($tokenParts[1]);
+    $signature_provided = $tokenParts[2];
+
+    // check the expiration time - note this will cause an error if there is no 'exp' claim in the jwt
+    $expiration = json_decode($payload)->exp;
+    $is_token_expired = ($expiration - time()) < 0;
+
+    // build a signature based on the header and payload using the secret
+    $base64_url_header = $this->base64url_encode($header);
+    $base64_url_payload = $this->base64url_encode($payload);
+    $signature = hash_hmac('SHA256', $base64_url_header . "." . $base64_url_payload, $secret["keys"][0]["n"], true);
+    $base64_url_signature = $this->base64url_encode($signature);
+
+    // verify it matches the signature provided in the jwt
+    $is_signature_valid = ($base64_url_signature === $signature_provided);
+
+    if ($is_token_expired || !$is_signature_valid) {
+      return FALSE;
+    } else {
+      return TRUE;
+    }
   }
 
 }
