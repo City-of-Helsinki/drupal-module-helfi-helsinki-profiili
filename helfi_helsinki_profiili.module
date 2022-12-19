@@ -62,7 +62,7 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
         $account->addRole($rolesConfig["hp_user_role_weak"]);
       }
     }
-    // user has used admin client for logging in
+    // User has used admin client for logging in.
     elseif ($context["plugin_id"] == $clientsConfig["hp_admin_client"]) {
       // Add admin roles for admin client logins.
       array_map(
@@ -86,7 +86,8 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
     }
 
     $account->save();
-  } catch (EntityStorageException $e) {
+  }
+  catch (EntityStorageException $e) {
   }
 
   if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
@@ -107,10 +108,12 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
           \Drupal::messenger()->addStatus('User logged in and data fetched');
         }
 
-      } catch (ProfileDataException $e) {
+      }
+      catch (ProfileDataException $e) {
         \Drupal::messenger()->addStatus($e->getMessage());
       }
-    } catch (GuzzleException $e) {
+    }
+    catch (GuzzleException $e) {
       \Drupal::messenger()->addError('User profile data fetch failed');
     }
   }
