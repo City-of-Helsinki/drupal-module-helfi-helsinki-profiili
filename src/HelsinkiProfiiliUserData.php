@@ -99,6 +99,13 @@ class HelsinkiProfiiliUserData {
   private array $openIdConfiguration;
 
   /**
+   * Request cache.
+   *
+   * @var array
+   */
+  private array $cachedData = [];
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -111,8 +118,8 @@ class HelsinkiProfiiliUserData {
    *   Current user session.
    * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $tempstore
    *   Access session store.
-   *
-   * @throws \Drupal\helfi_helsinki_profiili\ProfileDataException
+   * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
+   *   Where are we?
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
@@ -543,9 +550,7 @@ class HelsinkiProfiiliUserData {
    *   Is this cached?
    */
   private function isCached(string $key): bool {
-    return FALSE;
-    $tempStoreData = $this->tempStore->get('helsinki_profiili');
-    return isset($tempStoreData[$key]) && !empty($tempStoreData[$key]);
+    return isset($this->cachedData[$key]) && !empty($this->cachedData[$key]);
   }
 
   /**
@@ -559,21 +564,7 @@ class HelsinkiProfiiliUserData {
    */
   public function clearCache($key = ''): bool {
 
-    try {
-      if ($key == '') {
-        if (method_exists($this->tempStore, 'deleteAllUser')) {
-          $this->tempStore->deleteAllUser();
-        }
-      }
-      else {
-        $this->tempStore->delete($key);
-      }
-
-      return TRUE;
-    }
-    catch (\Exception $e) {
-      return FALSE;
-    }
+    return TRUE;
   }
 
   /**
@@ -585,9 +576,8 @@ class HelsinkiProfiiliUserData {
    * @return mixed|null
    *   Data in cache or null
    */
-  private function getFromCache(string $key) {
-    $tempStoreData = $this->tempStore->get('helsinki_profiili');
-    return (isset($tempStoreData[$key]) && !empty($tempStoreData[$key])) ? $tempStoreData[$key] : NULL;
+  private function getFromCache(string $key): mixed {
+    return (isset($this->cachedData[$key]) && !empty($this->cachedData[$key])) ? $this->cachedData[$key] : NULL;
   }
 
   /**
@@ -600,10 +590,8 @@ class HelsinkiProfiiliUserData {
    *
    * @throws \Drupal\Core\TempStore\TempStoreException
    */
-  private function setToCache(string $key, array $data) {
-    $tempStoreData = $this->tempStore->get('helsinki_profiili');
-    $tempStoreData[$key] = $data;
-    $this->tempStore->set('helsinki_profiili', $tempStoreData);
+  private function setToCache(string $key, array $data): void {
+    $this->cachedData[$key] = $data;
   }
 
   /**
@@ -637,16 +625,12 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-   * @param array $openIdConfiguration
-   */
-  public function setOpenIdConfiguration(array $openIdConfiguration): void {
-    $this->openIdConfiguration = $openIdConfiguration;
-  }
-
-  /**
    * Get openid configurations.
    *
    * @return array
+   *   Open id config from endpoint.
+   *
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
   public function getOpenIdConfiguration(): array {
     if (!$this->openIdConfiguration) {
@@ -659,6 +643,7 @@ class HelsinkiProfiiliUserData {
    * Get issuer configs from server.
    *
    * @return array
+   *   Config from env.
    *
    * @throws \GuzzleHttp\Exception\GuzzleException
    */
@@ -692,10 +677,11 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
+   * Get jwks keys from issuer.
    *
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
   public function getJwks() {
-    $data = [];
     $config = $this->getOpenIdConfiguration();
 
     $response = $this->httpClient->request(
@@ -708,63 +694,75 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-   * @param $tokenString
+   * Verify JWT token.
    *
-   * @return mixed
+   * WIP. At some point hopefully will get help with this and actually make
+   * this verify jwt token.
+   *
+   * @param string $tokenString
+   *   JWT token.
+   *
+   * @return bool
+   *   Is token valid or not.
    */
-  public function verifyJwtToken($tokenString) {
-
-    // $tokenData = $this->parseToken($tokenString);
-    //
-    //    $openIdConfig = $this->getOpenIdConfiguration();
-    //    $jwksConfig = $this->getJwks();
-    //
-    //    $this->is_jwt_valid($tokenString,$jwksConfig);
-    // $jwtVerifier = (new JwtVerifierBuilder())
-    //      ->setDiscovery(new Oidc()) // This is not needed if using oauth.  The other option is `new \Okta\JwtVerifier\Discovery\OIDC`
-    //      ->setAdaptor(new FirebasePhpJwt())
-    //      ->setAudience($tokenData["aud"])
-    //      ->setClientId($jwksConfig)
-    //      ->setIssuer($openIdConfig["issuer"])
-    //      ->build();
-    //
-    //    $t = $jwtVerifier->verify($tokenString);
+  public function verifyJwtToken(string $tokenString): bool {
     return TRUE;
   }
 
   /**
+   * Encode data as base64url.
    *
+   * @param array $data
+   *   Encode this.
+   *
+   * @return string
+   *   Encoded string.
    */
-  public function base64url_encode($data) {
+  public function base64urlEncode(array $data): string {
     return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
   }
 
   /**
+   * Decode base64urlencoded string.
    *
+   * @param string $data
+   *   Encoded string.
+   *
+   * @return false|string
+   *   Decoded string or false at failure.
    */
-  public function base64url_decode($data) {
+  public function base64urlDecode(string $data): bool|string {
     return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
   }
 
   /**
+   * Check validity of jwt token.
    *
+   * @param string $jwt
+   *   JWT token.
+   * @param string $secret
+   *   Secret used to decode.
+   *
+   * @return bool
+   *   IS token valid?
    */
-  public function is_jwt_valid($jwt, $secret) {
+  public function isJwtValid(string $jwt, string $secret): bool {
     // Split the jwt.
     $tokenParts = explode('.', $jwt);
     $header = base64_decode($tokenParts[0]);
     $payload = base64_decode($tokenParts[1]);
     $signature_provided = $tokenParts[2];
 
-    // Check the expiration time - note this will cause an error if there is no 'exp' claim in the jwt.
+    // Check the expiration time - note this will cause an error if there is
+    // no 'exp' claim in the jwt.
     $expiration = json_decode($payload)->exp;
     $is_token_expired = ($expiration - time()) < 0;
 
     // Build a signature based on the header and payload using the secret.
-    $base64_url_header = $this->base64url_encode($header);
-    $base64_url_payload = $this->base64url_encode($payload);
+    $base64_url_header = $this->base64urlEncode($header);
+    $base64_url_payload = $this->base64urlEncode($payload);
     $signature = hash_hmac('SHA256', $base64_url_header . "." . $base64_url_payload, $secret["keys"][0]["n"], TRUE);
-    $base64_url_signature = $this->base64url_encode($signature);
+    $base64_url_signature = $this->base64urlEncode($signature);
 
     // Verify it matches the signature provided in the jwt.
     $is_signature_valid = ($base64_url_signature === $signature_provided);
