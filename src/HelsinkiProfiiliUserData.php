@@ -11,6 +11,8 @@ use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\openid_connect\OpenIDConnectSession;
+use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -696,17 +698,16 @@ class HelsinkiProfiiliUserData {
   /**
    * Verify JWT token.
    *
-   * WIP. At some point hopefully will get help with this and actually make
-   * this verify jwt token.
-   *
-   * @param string $tokenString
+   * @param string $jwt
    *   JWT token.
    *
-   * @return bool
+   * @return array
    *   Is token valid or not.
+   *
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
-  public function verifyJwtToken(string $tokenString): bool {
-    return TRUE;
+  public function verifyJwtToken(string $jwt): array {
+    return (array) JWT::decode($jwt, JWK::parseKeySet($this->getJwks()));
   }
 
   /**
