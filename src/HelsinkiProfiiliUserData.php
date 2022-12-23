@@ -225,12 +225,7 @@ class HelsinkiProfiiliUserData {
    *   Userdata from tempstore.
    */
   public function getUserData() {
-    if ($this->isCached('userData')) {
-      return $this->getFromCache('userData');
-    }
-    else {
-      return NULL;
-    }
+    return $this->getTokenData();
   }
 
   /**
