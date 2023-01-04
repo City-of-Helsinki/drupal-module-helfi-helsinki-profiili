@@ -108,6 +108,13 @@ class HelsinkiProfiiliUserData {
   private array $cachedData = [];
 
   /**
+   * Debug status.
+   *
+   * @var bool
+   */
+  protected bool $debug;
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -155,6 +162,15 @@ class HelsinkiProfiiliUserData {
     }
     else {
       $this->hpAdminRoles = [];
+    }
+
+    $debug = getenv('DEBUG');
+
+    if ($debug == 'true' || $debug === TRUE) {
+      $this->debug = TRUE;
+    }
+    else {
+      $this->debug = FALSE;
     }
 
   }
@@ -236,12 +252,12 @@ class HelsinkiProfiiliUserData {
    *
    * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
    */
-  public function getApiAccessTokens() {
+  public function getApiAccessTokens(): ?array {
     // Access token to get api access tokens in next step.
     $accessToken = $this->openidConnectSession->retrieveAccessToken();
 
     if ($accessToken == NULL) {
-      return NULL;
+      throw new TokenExpiredException('No token data available');
     }
 
     // Use access token to fetch profiili token from token service.
@@ -704,4 +720,39 @@ class HelsinkiProfiiliUserData {
   public function verifyJwtToken(string $jwt): array {
     return (array) JWT::decode($jwt, JWK::parseKeySet($this->getJwks()));
   }
+
+  /**
+   * Print debug messages.
+   *
+   * @param string $message
+   *   Message.
+   * @param array $replacements
+   *   Replacements.
+   */
+  public function debugPrint(string $message, array $replacements = []): void {
+    if ($this->isDebug()) {
+      $this->logger->debug($message, $replacements);
+    }
+  }
+
+  /**
+   * Is debug on?
+   *
+   * @return bool
+   *   Debug boolean.
+   */
+  public function isDebug(): bool {
+    return $this->debug;
+  }
+
+  /**
+   * Set debug value.
+   *
+   * @param bool $debug
+   *   Debug boolean value.
+   */
+  public function setDebug(bool $debug): void {
+    $this->debug = $debug;
+  }
+
 }
