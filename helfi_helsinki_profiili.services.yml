@@ -6,7 +6,7 @@ services:
       '@http_client',
       '@logger.factory',
       '@current_user',
-      '@tempstore.private',
+      '@request_stack',
       '@helfi_api_base.environment_resolver'
     ]
 

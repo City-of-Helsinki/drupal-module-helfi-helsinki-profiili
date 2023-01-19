@@ -4,10 +4,9 @@ namespace Drupal\helfi_helsinki_profiili;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\Core\TempStore\PrivateTempStore;
-use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\openid_connect\OpenIDConnectSession;
@@ -66,11 +65,11 @@ class HelsinkiProfiiliUserData {
   protected AccountProxyInterface $currentUser;
 
   /**
-   * Access to session storage.
+   * Request stack for session access.
    *
-   * @var \Drupal\Core\TempStore\PrivateTempStore
+   * @var \Drupal\Core\Http\RequestStack
    */
-  protected PrivateTempStore $tempStore;
+  protected RequestStack $requestStack;
 
   /**
    * Store user roles for helsinki profile users.
@@ -125,7 +124,7 @@ class HelsinkiProfiiliUserData {
    *   The logger channel factory.
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
    *   Current user session.
-   * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $tempstore
+   * @param \Drupal\Core\Http\RequestStack $requestStack
    *   Access session store.
    * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
    *   Where are we?
@@ -135,7 +134,7 @@ class HelsinkiProfiiliUserData {
     ClientInterface $http_client,
     LoggerChannelFactoryInterface $logger_factory,
     AccountProxyInterface $currentUser,
-    PrivateTempStoreFactory $tempstore,
+    RequestStack $requestStack,
     EnvironmentResolverInterface $environmentResolver) {
 
     $this->openidConnectSession = $openid_connect_session;
@@ -144,7 +143,7 @@ class HelsinkiProfiiliUserData {
 
     $this->logger = $logger_factory->get('helsinki_profiili');
     $this->currentUser = $currentUser;
-    $this->tempStore = $tempstore->get('helsinki_profiili');
+    $this->requestStack = $requestStack;
 
     $this->openIdConfiguration = [];
 
@@ -562,22 +561,31 @@ class HelsinkiProfiiliUserData {
    * @return bool
    *   Is this cached?
    */
-  private function isCached(string $key): bool {
-    return isset($this->cachedData[$key]) && !empty($this->cachedData[$key]);
+  public function clearCache($key = ''): bool {
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+    try {
+      // $session->clear();
+      return TRUE;
+    }
+    catch (\Exception $e) {
+      return FALSE;
+    }
   }
 
   /**
    * Whether or not we have made this query?
    *
-   * @param string $key
+   * @param string|null $key
    *   Used key for caching.
    *
    * @return bool
    *   Is this cached?
    */
-  public function clearCache($key = ''): bool {
+  private function isCached(?string $key): bool {
+    $session = $this->requestStack->getCurrentRequest()->getSession();
 
-    return TRUE;
+    $cacheData = $session->get($key);
+    return !is_null($cacheData);
   }
 
   /**
@@ -586,11 +594,12 @@ class HelsinkiProfiiliUserData {
    * @param string $key
    *   Key to fetch from tempstore.
    *
-   * @return mixed|null
+   * @return array|null
    *   Data in cache or null
    */
-  private function getFromCache(string $key): mixed {
-    return (isset($this->cachedData[$key]) && !empty($this->cachedData[$key])) ? $this->cachedData[$key] : NULL;
+  private function getFromCache(string $key): array|null {
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+    return !empty($session->get($key)) ? $session->get($key) : NULL;
   }
 
   /**
@@ -601,10 +610,16 @@ class HelsinkiProfiiliUserData {
    * @param array $data
    *   Cached data.
    *
-   * @throws \Drupal\Core\TempStore\TempStoreException
+   * @return bool
+   *   Did save succeed?
    */
-  private function setToCache(string $key, array $data): void {
-    $this->cachedData[$key] = $data;
+  private function setToCache(string $key, array $data): bool {
+
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+
+    $session->set($key, $data);
+    return TRUE;
+
   }
 
   /**
