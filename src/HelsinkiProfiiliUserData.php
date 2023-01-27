@@ -344,7 +344,7 @@ class HelsinkiProfiiliUserData {
       }
       // Make sure that data coming from HP is sanitized and does not contain
       // anything worth removing.
-      $cleaned = array_walk_recursive(
+      array_walk_recursive(
         $data,
         function (&$item) {
           if (is_string($item)) {
@@ -352,6 +352,9 @@ class HelsinkiProfiiliUserData {
           }
         }
       );
+
+      $data = $this->checkPrimaryField($data, 'phone');
+      $data = $this->checkPrimaryField($data, 'email');
 
       // Set profile data to cache so that no need to fetch more data.
       $this->setToCache('myProfile', $data);
@@ -619,6 +622,66 @@ class HelsinkiProfiiliUserData {
 
     $session->set($key, $data);
     return TRUE;
+
+  }
+
+  /**
+   * Fill primaryPhone field from edge nodes, if it is missing.
+   *
+   * @param array $data
+   *   Data array
+   *
+   * @param string $field
+   *   Field to check (email | phone)
+   *
+   * @return array
+   *   Modified array
+   */
+  private function checkPrimaryField(array $data, $field): array {
+
+    static $fieldMapping = [
+      'phone' => [
+        'primary_field_key' => 'primaryPhone',
+        'field_key' => 'phones',
+      ],
+      'email' => [
+        'primary_field_key' => 'primaryEmail',
+        'field_key' => 'emails',
+      ]
+    ];
+
+    list(
+      'primary_field_key' => $primaryFieldKey,
+      'field_key' => $fieldKey,
+    ) = $fieldMapping[$field];
+
+    $primaryField = $data['myProfile'][$primaryFieldKey];
+    if ($primaryField === NULL) {
+
+      /*
+       * Loop phone edges. Get first node with verified flag, or
+       * the first phone if none is verified.
+       */
+      foreach ($data['myProfile'][$fieldKey]['edges'] as $edge) {
+        if ($edge['node']['primary']) {
+          $primaryField = $edge['node'];
+          break;
+        }
+      }
+
+      // No primary flagged. Try to get first phone number.
+      if ($primaryField === NULL) {
+        $primaryField = $data['myProfile'][$fieldKey]['edges'][0]['node'] ?? NULL;
+      }
+
+      // If we have a number, let's add it to the data array.
+      if ($primaryField !== NULL) {
+        $data['myProfile'][$primaryFieldKey] = $primaryField;
+      }
+
+    }
+
+    return $data;
 
   }
 
