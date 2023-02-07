@@ -353,12 +353,11 @@ class HelsinkiProfiiliUserData {
         }
       );
 
-      $data = $this->checkPrimaryField($data, 'phone');
-      $data = $this->checkPrimaryField($data, 'email');
+      $modifiedData = $this->checkPrimaryFields($data);
 
       // Set profile data to cache so that no need to fetch more data.
-      $this->setToCache('myProfile', $data);
-      return $data;
+      $this->setToCache('myProfile', $modifiedData);
+      return $modifiedData;
 
     }
     catch (ClientException | ServerException $e) {
@@ -637,7 +636,7 @@ class HelsinkiProfiiliUserData {
    * @return array
    *   Modified array
    */
-  private function checkPrimaryField(array $data, $field): array {
+  private function checkPrimaryFields(array $data): array {
 
     static $fieldMapping = [
       'phone' => [
@@ -647,38 +646,46 @@ class HelsinkiProfiiliUserData {
       'email' => [
         'primary_field_key' => 'primaryEmail',
         'field_key' => 'emails',
+      ],
+      'address' => [
+        'primary_field_key' => 'primaryAddress',
+        'field_key' => 'addresses',
       ]
     ];
 
-    list(
-      'primary_field_key' => $primaryFieldKey,
-      'field_key' => $fieldKey,
-    ) = $fieldMapping[$field];
 
-    $primaryField = $data['myProfile'][$primaryFieldKey];
-    if ($primaryField === NULL) {
+    foreach($fieldMapping as $mapping) {
 
-      /*
-       * Loop phone edges. Get first node with verified flag, or
-       * the first phone if none is verified.
-       */
-      foreach ($data['myProfile'][$fieldKey]['edges'] as $edge) {
-        if ($edge['node']['primary']) {
-          $primaryField = $edge['node'];
-          break;
-        }
-      }
+      list(
+        'primary_field_key' => $primaryFieldKey,
+        'field_key' => $fieldKey,
+      ) = $mapping;
 
-      // No primary flagged. Try to get first phone number.
+      $primaryField = $data['myProfile'][$primaryFieldKey];
       if ($primaryField === NULL) {
-        $primaryField = $data['myProfile'][$fieldKey]['edges'][0]['node'] ?? NULL;
-      }
 
-      // If we have a number, let's add it to the data array.
-      if ($primaryField !== NULL) {
-        $data['myProfile'][$primaryFieldKey] = $primaryField;
-      }
+        /*
+        * Loop the edges. Get first node with verified flag, or
+        * the first edge if none is verified.
+        */
+        foreach ($data['myProfile'][$fieldKey]['edges'] as $edge) {
+          if ($edge['node']['primary']) {
+            $primaryField = $edge['node'];
+            break;
+          }
+        }
 
+        // No primary flagged. Try to get first edge number.
+        if ($primaryField === NULL) {
+          $primaryField = $data['myProfile'][$fieldKey]['edges'][0]['node'] ?? NULL;
+        }
+
+        // If we have a edge, let's add it to the data array.
+        if ($primaryField !== NULL) {
+          $data['myProfile'][$primaryFieldKey] = $primaryField;
+        }
+
+      }
     }
 
     return $data;
