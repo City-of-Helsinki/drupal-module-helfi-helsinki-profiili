@@ -743,14 +743,20 @@ class HelsinkiProfiiliUserData {
       'local' => self::TESTING_ENVIRONMENT,
       'dev' => self::TESTING_ENVIRONMENT,
       'test' => self::TESTING_ENVIRONMENT,
+      'testing' => self::TESTING_ENVIRONMENT,
       'stage' => self::STAGING_ENVIRONMENT,
+      'staging' => self::STAGING_ENVIRONMENT,
       'prod' => self::PRODUCTION_ENVIRONMENT,
     ];
     $base = self::STAGING_ENVIRONMENT;
 
+    $this->debugPrint('Endpoint maps: @maps', ['@maps' => Json::encode($endpointMap)]);
+
     try {
       // Attempt to automatically detect endpoint.
       $env = $this->environmentResolver->getActiveEnvironmentName();
+
+      $this->debugPrint('Active environment: @maps', ['@maps' => $env]);
 
       if (isset($endpointMap[$env])) {
         $base = $endpointMap[$env];
@@ -758,6 +764,8 @@ class HelsinkiProfiiliUserData {
     }
     catch (\InvalidArgumentException) {
     }
+
+    $this->debugPrint('Enpoint selector: @maps', ['@maps' => $base]);
 
     return Json::decode(
       $this->httpClient->request(
@@ -796,6 +804,11 @@ class HelsinkiProfiiliUserData {
    * @throws \GuzzleHttp\Exception\GuzzleException
    */
   public function verifyJwtToken(string $jwt): array {
+
+    $jwks = $this->getJwks();
+
+    $this->debugPrint('JWKS -> @jwks', ['@jwks' => Json::encode($jwks)]);
+
     return (array) JWT::decode($jwt, JWK::parseKeySet($this->getJwks()));
   }
 
