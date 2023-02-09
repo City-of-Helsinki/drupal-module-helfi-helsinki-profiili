@@ -8,3 +8,123 @@
  * This file is no longer required in Drupal 8.
  * @see https://www.drupal.org/node/2217931
  */
+
+use Drupal\Core\Session\AccountProxyInterface;
+use GuzzleHttp\Exception\GuzzleException;
+use Drupal\Core\Entity\EntityStorageException;
+use Drupal\helfi_helsinki_profiili\ProfileDataException;
+use Drupal\user\UserInterface;
+
+/**
+ * OpenID Connect post authorize hook.
+ *
+ * This hook runs after a user has been authorized and claims have been mapped
+ * to the user's account.
+ *
+ * A popular use case for this hook is to saving token and additional identity
+ * provider related information to the user's Drupal session (private temp
+ * store).
+ *
+ * @param \Drupal\user\UserInterface $account
+ *   User account object of the authorized user.
+ * @param array $context
+ *   An associative array with context information:
+ *   - tokens:         An array of tokens.
+ *   - user_data:      An array of user and session data.*
+ *   - plugin_id:      The plugin identifier.
+ *   - sub:            The remote user identifier.
+ *
+ * @ingroup openid_connect_api
+ */
+function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context) {
+
+  // Remove all existing roles.
+  array_map(
+    fn(string $rid) => $account->removeRole($rid),
+    $account->getRoles(FALSE)
+  );
+
+  // Save role deletion.
+  $account->save();
+
+  $config = \Drupal::config('helfi_helsinki_profiili.settings');
+  $rolesConfig = $config->get('roles');
+  $clientsConfig = $config->get('clients');
+
+  try {
+    if ($context["plugin_id"] == $clientsConfig["hp_user_client"]) {
+      // Add strong auth for strong auth and weak for other.
+      // @todo this will need to change when we actually see what the difference here is.
+      if ($context["user_data"]["loa"] == 'substantial') {
+        $account->addRole($rolesConfig["hp_user_role_strong"]);
+      }
+      else {
+        $account->addRole($rolesConfig["hp_user_role_weak"]);
+      }
+    }
+    // User has used admin client for logging in.
+    elseif ($context["plugin_id"] == $clientsConfig["hp_admin_client"]) {
+      // Add admin roles for admin client logins.
+      array_map(
+        fn(string $rid) => $account->addRole($rid),
+        $rolesConfig["admin_user_roles"]
+      );
+      if (isset($context["user_data"]["ad_groups"]) && !empty($context["user_data"]["ad_groups"])) {
+        // Get ad groups from config.
+        $adRoleMappings = $config->get('ad_role_mappings');
+        // Add mapped roles for users' ad groups.
+        array_map(
+          function ($adGroup) use ($account, $adRoleMappings) {
+            array_map(
+              fn(string $rid) => $account->addRole($rid),
+              $adRoleMappings[$adGroup] ?? []
+            );
+          },
+          $context["user_data"]["ad_groups"]
+        );
+      }
+    }
+
+    $account->save();
+  }
+  catch (EntityStorageException $e) {
+  }
+
+  if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
+    try {
+      /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
+      $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
+      // Set user data from openid.
+      $profileDAO->setUserData($context['user_data']);
+      // Fetch HelsinkiProfile data.
+      try {
+        $data = $profileDAO->getUserProfileData();
+
+        if ($data == NULL) {
+          \Drupal::messenger()
+            ->addWarning('User logged in, no profiledata found.');
+        }
+        else {
+          \Drupal::messenger()->addStatus('User logged in and data fetched');
+        }
+
+      }
+      catch (ProfileDataException $e) {
+        \Drupal::messenger()->addStatus($e->getMessage());
+      }
+    }
+    catch (GuzzleException $e) {
+      \Drupal::messenger()->addError('User profile data fetch failed');
+    }
+  }
+
+}
+
+/**
+ * Implements hook_user_logout().
+ */
+function helfi_helsinki_profiili_user_logout(AccountProxyInterface $account) {
+  /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
+  $helsinkiProfiili = \Drupal::service('helfi_helsinki_profiili.userdata');
+  $helsinkiProfiili->clearCache();
+}

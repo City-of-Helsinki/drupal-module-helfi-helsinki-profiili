@@ -1,0 +1,23 @@
+helfi_helsinki_profiili.settings:
+  type: config_object
+  mapping:
+    roles:
+      type: sequence
+      label: 'Roles for helsinki profile.'
+      sequence:
+        hp_user_roles:
+          type: sequence
+          label: 'User roles used with helsinki profile'
+        admin_user_roles:
+          type: sequence
+          label: 'Roles for admin users.'
+        hp_user_role_strong:
+          type: string
+          label: 'User role strong auth'
+        hp_user_role_weak:
+          type: string
+          label: 'User role weak auth'
+    clients:
+      type: sequence
+      label: 'Client ids used with helsinki profile.'
+

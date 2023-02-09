@@ -1,4 +1,23 @@
 services:
   helfi_helsinki_profiili.userdata:
     class: Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData
-    arguments: ['@openid_connect.session', '@http_client', '@logger.factory', '@current_user']
+    arguments: [
+      '@openid_connect.session',
+      '@http_client',
+      '@logger.factory',
+      '@current_user',
+      '@request_stack',
+      '@helfi_api_base.environment_resolver'
+    ]
+
+  helfi_helsinki_profiili.middleware:
+    class: Drupal\helfi_helsinki_profiili\RegisterPageRedirectMiddleware
+    arguments: ['@messenger']
+    tags:
+      - { name: http_middleware, priority: 1000 }
+
+  helfi_helsinki_profiili.token_event_subscriber:
+    class: Drupal\helfi_helsinki_profiili\EventSubscriber\TokenExpiredExceptionSubscriber
+    arguments: ['@messenger']
+    tags:
+      - { name: event_subscriber }

@@ -3,15 +3,31 @@
 namespace Drupal\helfi_helsinki_profiili;
 
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\Xss;
+use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\TempStore\TempStoreException;
+use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\openid_connect\OpenIDConnectSession;
+use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
 use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\ServerException;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
  */
 class HelsinkiProfiiliUserData {
+
+
+  public const TESTING_ENVIRONMENT = 'https://tunnistamo.test.hel.ninja';
+
+  public const STAGING_ENVIRONMENT = 'https://api.hel.fi/sso-test';
+
+  public const PRODUCTION_ENVIRONMENT = 'https://api.hel.fi/sso';
 
   /**
    * The openid_connect.session service.
@@ -49,6 +65,55 @@ class HelsinkiProfiiliUserData {
   protected AccountProxyInterface $currentUser;
 
   /**
+   * Request stack for session access.
+   *
+   * @var \Drupal\Core\Http\RequestStack
+   */
+  protected RequestStack $requestStack;
+
+  /**
+   * Store user roles for helsinki profile users.
+   *
+   * @var array
+   */
+  protected array $hpUserRoles;
+
+  /**
+   * User roles for form administration.
+   *
+   * @var array
+   */
+  protected array $hpAdminRoles;
+
+  /**
+   * The environment resolver.
+   *
+   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
+   */
+  private EnvironmentResolverInterface $environmentResolver;
+
+  /**
+   * Store details about oidc issuer.
+   *
+   * @var array
+   */
+  private array $openIdConfiguration;
+
+  /**
+   * Request cache.
+   *
+   * @var array
+   */
+  private array $cachedData = [];
+
+  /**
+   * Debug status.
+   *
+   * @var bool
+   */
+  protected bool $debug;
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -59,25 +124,54 @@ class HelsinkiProfiiliUserData {
    *   The logger channel factory.
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
    *   Current user session.
+   * @param \Drupal\Core\Http\RequestStack $requestStack
+   *   Access session store.
+   * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
+   *   Where are we?
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
     ClientInterface $http_client,
     LoggerChannelFactoryInterface $logger_factory,
-    AccountProxyInterface $currentUser) {
+    AccountProxyInterface $currentUser,
+    RequestStack $requestStack,
+    EnvironmentResolverInterface $environmentResolver) {
 
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
+    $this->environmentResolver = $environmentResolver;
 
     $this->logger = $logger_factory->get('helsinki_profiili');
     $this->currentUser = $currentUser;
+    $this->requestStack = $requestStack;
 
-    if ($this->isAuthenticatedExternally()) {
-      $this->userProfileData = $this->getUserProfileData();
+    $this->openIdConfiguration = [];
+
+    $config = \Drupal::config('helfi_helsinki_profiili.settings');
+    $rolesConfig = $config->get('roles');
+
+    if (!empty($rolesConfig['hp_user_roles'])) {
+      $this->hpUserRoles = $rolesConfig['hp_user_roles'];
     }
     else {
-      $this->userProfileData = [];
+      $this->hpUserRoles = [];
     }
+    if (!empty($rolesConfig['admin_user_roles'])) {
+      $this->hpAdminRoles = $rolesConfig['admin_user_roles'];
+    }
+    else {
+      $this->hpAdminRoles = [];
+    }
+
+    $debug = getenv('DEBUG');
+
+    if ($debug == 'true' || $debug === TRUE) {
+      $this->debug = TRUE;
+    }
+    else {
+      $this->debug = FALSE;
+    }
+
   }
 
   /**
@@ -91,32 +185,134 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-   * Get user profile data from tunnistamo.
+   * Get user authentication level from suomifi / helsinkiprofile.
+   *
+   * @return string
+   *   Authentication level to be tested.
+   *
+   * @todo When auth levels are set in HP, check that these match.
+   */
+  public function getAuthenticationLevel(): string {
+    $authLevel = 'noAuth';
+
+    $userData = $this->getUserData();
+
+    if ($userData == NULL) {
+      return $authLevel;
+    }
+
+    if ($userData['loa'] == 'substantial') {
+      return 'strong';
+    }
+    if ($userData['loa'] == 'low') {
+      return 'weak';
+    }
+
+    return $authLevel;
+  }
+
+  /**
+   * Return parsed JWT token data from openid.
    *
    * @return array
-   *   User profile data.
-   * @throws \GuzzleHttp\Exception\GuzzleException
+   *   Token data for authenticated user.
    */
-  public function getUserProfileData(): array {
+  public function getTokenData(): array {
+    return $this->parseToken($this->openidConnectSession->retrieveIdToken());
+  }
 
-    if (!empty($this->userProfileData)) {
-      return $this->userProfileData;
+  /**
+   * Set user data to private store.
+   *
+   * @var array $userData
+   *  Userdata retrieved from HP.
+   *
+   * @throws \Drupal\Core\TempStore\TempStoreException
+   */
+  public function setUserData($userData) {
+    return $this->setToCache('userData', $userData);
+  }
+
+  /**
+   * Get user data from tempstore.
+   *
+   * @return array
+   *   Userdata from tempstore.
+   */
+  public function getUserData() {
+    return $this->getTokenData();
+  }
+
+  /**
+   * Get access tokens from helsinki profiili.
+   *
+   * @return array|null
+   *   Accesstokens or null.
+   *
+   * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
+   */
+  public function getApiAccessTokens(): ?array {
+    // Access token to get api access tokens in next step.
+    $accessToken = $this->openidConnectSession->retrieveAccessToken();
+
+    if ($accessToken == NULL) {
+      throw new TokenExpiredException('No token data available');
     }
 
-    $endpoint = getenv('USERINFO_ENDPOINT');
+    // Use access token to fetch profiili token from token service.
+    return $this->getHelsinkiProfiiliToken($accessToken);
+
+  }
+
+  /**
+   * Get user profile data from tunnistamo.
+   *
+   * @param bool $refetch
+   *   Non false value will bypass caching.
+   *
+   * @return array|null
+   *   User profile data.
+   *
+   * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
+   */
+  public function getUserProfileData(bool $refetch = FALSE): ?array {
+
+    // Access token to get api access tokens in next step.
+    $accessToken = $this->openidConnectSession->retrieveAccessToken();
+
+    if ($accessToken == NULL) {
+      return NULL;
+    }
+
+    if ($refetch == FALSE && $this->isCached('myProfile')) {
+      $myProfile = $this->getFromCache('myProfile');
+      return $myProfile;
+    }
+
+    // End point to access profile data.
+    $endpoint = getenv('USERINFO_PROFILE_ENDPOINT');
+    // Get query.
     $query = $this->graphqlQuery();
     $variables = [];
-    $token = $this->openidConnectSession->retrieveIdToken();
-
-    $headers = [
-      'Content-Type: application/json',
-      'User-Agent: Avustus2 dev application',
-    ];
-    if (NULL !== $token) {
-      $headers[] = "Authorization: bearer $token";
-    }
 
     try {
+
+      // Use access token to fetch profiili token from token service.
+      $apiAccessToken = $this->getHelsinkiProfiiliToken($accessToken);
+
+      $headers = [
+        'Content-Type' => 'application/json',
+      ];
+      // Use api access token if set, if not, return NULL.
+      if (isset($apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'])) {
+        $headers['Authorization'] = 'Bearer ' . $apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'];
+      }
+      else {
+        // No point going further if no token is received.
+        return NULL;
+      }
+
+      // Get profiili data with api access token.
       $response = $this->httpClient->request('POST', $endpoint, [
         'headers' => $headers,
         'json' => [
@@ -129,10 +325,8 @@ class HelsinkiProfiiliUserData {
       $body = Json::decode($json);
       $data = $body['data'];
 
-      // @todo fix graphql error reporting
       if (!empty($body['errors'])) {
         foreach ($body['errors'] as $error) {
-
           $this->logger->error(
             '/userinfo endpoint threw errorcode %ecode: @error',
             [
@@ -141,38 +335,107 @@ class HelsinkiProfiiliUserData {
             ]
           );
         }
+        throw new ProfileDataException('No profile data found');
       }
       else {
         $this->logger->notice('User %user got their HelsinkiProfiili data form endpoint', [
           '%user' => $this->currentUser->getDisplayName(),
         ]);
       }
+      // Make sure that data coming from HP is sanitized and does not contain
+      // anything worth removing.
+      array_walk_recursive(
+        $data,
+        function (&$item) {
+          if (is_string($item)) {
+            $item = Xss::filter($item);
+          }
+        }
+      );
+
+      $data = $this->checkPrimaryField($data, 'phone');
+      $data = $this->checkPrimaryField($data, 'email');
+
+      // Set profile data to cache so that no need to fetch more data.
+      $this->setToCache('myProfile', $data);
+      return $data;
 
     }
-    catch (GuzzleException $e) {
+    catch (ClientException | ServerException $e) {
+
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
         [
-          '%ecode' => $error['extensions']['code'],
-          '@error' => $error['message'],
+          '%ecode' => $e->getCode(),
+          '@error' => $e->getMessage(),
+        ]
+          );
+
+      return NULL;
+
+    }
+    catch (TempStoreException $e) {
+      $this->logger->error(
+        'Caching userprofile data failed',
+        [
+          '%ecode' => $e->getCode(),
+          '@error' => $e->getMessage(),
         ]
           );
     }
+    catch (GuzzleException $e) {
+    }
+    catch (ProfileDataException $e) {
+      $this->logger->error(
+        $e->getMessage()
+          );
 
-    // @todo remove hardcoded myprofile data
-    $data = $this->demoData();
+      return NULL;
 
-    return Json::decode($data);
+    }
+
+    return NULL;
   }
 
   /**
-   * Get SSN from data structure.
+   * Fetch proper tokens from api-tokens endopoint.
    *
-   * @return mixed
-   *   User SSN.
+   * @param string $accessToken
+   *   Token from authorization service.
+   *
+   * @return array|null
+   *   Token data
+   *
+   * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
    */
-  public function getSsn() {
-    return $this->userProfileData["myProfile"]["verifiedPersonalInformation"]["nationalIdentificationNumber"];
+  private function getHelsinkiProfiiliToken(string $accessToken): ?array {
+    try {
+      $response = $this->httpClient->request('GET', 'https://tunnistamo.test.hel.ninja/api-tokens/', [
+        'headers' => [
+          'Authorization' => 'Bearer ' . $accessToken,
+        ],
+      ]);
+      $body = $response->getBody()->getContents();
+
+      if (strlen($body) < 5) {
+        throw new ProfileDataException('No data from profile endpoint');
+      }
+      return Json::decode($body);
+    }
+    catch (ProfileDataException $profileDataException) {
+      $this->logger->error('Trying to get tokens from api-tokens endpoint, got empty body: @error', ['@error' => $profileDataException->getMessage()]);
+      return NULL;
+    }
+    catch (GuzzleException | \Exception $e) {
+      $this->logger->error(
+        'Error retrieving access token %ecode: @error',
+        [
+          '%ecode' => $e->getCode(),
+          '@error' => $e->getMessage(),
+        ]
+          );
+      throw new TokenExpiredException($e->getMessage());
+    }
   }
 
   /**
@@ -278,10 +541,10 @@ class HelsinkiProfiiliUserData {
    * @param string $token
    *   The encoded ID token containing the user data.
    *
-   * @return array|string
+   * @return array
    *   The parsed JWT token or the original string.
    */
-  protected function parseToken(string $token) {
+  public function parseToken(string $token): array {
     $parts = explode('.', $token, 3);
     if (count($parts) === 3) {
       $decoded = Json::decode(base64_decode($parts[1]));
@@ -289,206 +552,298 @@ class HelsinkiProfiiliUserData {
         return $decoded;
       }
     }
-    return $token;
+    return [];
   }
 
   /**
-   * Demo data for when the strong auth is broken.
+   * Whether or not we have made this query?
    *
-   * @return string
-   *   Profile data demo.
+   * @param string $key
+   *   Used key for caching.
+   *
+   * @return bool
+   *   Is this cached?
    */
-  private function demoData(): string {
+  public function clearCache($key = ''): bool {
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+    try {
+      // $session->clear();
+      return TRUE;
+    }
+    catch (\Exception $e) {
+      return FALSE;
+    }
+  }
 
-    $this->logger->error(
-      'USERINFO USING DEMO DATA for %user',
-      [
-        '%user' => $this->currentUser->getDisplayName(),
+  /**
+   * Whether or not we have made this query?
+   *
+   * @param string|null $key
+   *   Used key for caching.
+   *
+   * @return bool
+   *   Is this cached?
+   */
+  private function isCached(?string $key): bool {
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+
+    $cacheData = $session->get($key);
+    return !is_null($cacheData);
+  }
+
+  /**
+   * Get item from cache.
+   *
+   * @param string $key
+   *   Key to fetch from tempstore.
+   *
+   * @return array|null
+   *   Data in cache or null
+   */
+  private function getFromCache(string $key): array|null {
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+    return !empty($session->get($key)) ? $session->get($key) : NULL;
+  }
+
+  /**
+   * Add item to cache.
+   *
+   * @param string $key
+   *   Used key for caching.
+   * @param array $data
+   *   Cached data.
+   *
+   * @return bool
+   *   Did save succeed?
+   */
+  private function setToCache(string $key, array $data): bool {
+
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+
+    $session->set($key, $data);
+    return TRUE;
+
+  }
+
+  /**
+   * Fill primaryPhone field from edge nodes, if it is missing.
+   *
+   * @param array $data
+   *   Data array
+   *
+   * @param string $field
+   *   Field to check (email | phone)
+   *
+   * @return array
+   *   Modified array
+   */
+  private function checkPrimaryField(array $data, $field): array {
+
+    static $fieldMapping = [
+      'phone' => [
+        'primary_field_key' => 'primaryPhone',
+        'field_key' => 'phones',
+      ],
+      'email' => [
+        'primary_field_key' => 'primaryEmail',
+        'field_key' => 'emails',
       ]
+    ];
+
+    list(
+      'primary_field_key' => $primaryFieldKey,
+      'field_key' => $fieldKey,
+    ) = $fieldMapping[$field];
+
+    $primaryField = $data['myProfile'][$primaryFieldKey];
+    if ($primaryField === NULL) {
+
+      /*
+       * Loop phone edges. Get first node with verified flag, or
+       * the first phone if none is verified.
+       */
+      foreach ($data['myProfile'][$fieldKey]['edges'] as $edge) {
+        if ($edge['node']['primary']) {
+          $primaryField = $edge['node'];
+          break;
+        }
+      }
+
+      // No primary flagged. Try to get first phone number.
+      if ($primaryField === NULL) {
+        $primaryField = $data['myProfile'][$fieldKey]['edges'][0]['node'] ?? NULL;
+      }
+
+      // If we have a number, let's add it to the data array.
+      if ($primaryField !== NULL) {
+        $data['myProfile'][$primaryFieldKey] = $primaryField;
+      }
+
+    }
+
+    return $data;
+
+  }
+
+  /**
+   * Get current user data.
+   *
+   * @return \Drupal\Core\Session\AccountProxyInterface
+   *   Current user.
+   */
+  public function getCurrentUser(): AccountProxyInterface {
+    return $this->currentUser;
+  }
+
+  /**
+   * Get user roles that have helsinki profile authentication.
+   *
+   * @return array
+   *   Helsinki profiili user roles.
+   */
+  public function getHpUserRoles(): array {
+    return $this->hpUserRoles;
+  }
+
+  /**
+   * Get admin roles.
+   *
+   * @return array
+   *   Helsinki profiili admin roles.
+   */
+  public function getAdminRoles(): array {
+    return $this->hpAdminRoles;
+  }
+
+  /**
+   * Get openid configurations.
+   *
+   * @return array
+   *   Open id config from endpoint.
+   *
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function getOpenIdConfiguration(): array {
+    if (!$this->openIdConfiguration) {
+      $this->openIdConfiguration = $this->getOpenidConfigurationFromIssuer();
+    }
+    return $this->openIdConfiguration;
+  }
+
+  /**
+   * Get issuer configs from server.
+   *
+   * @return array
+   *   Config from env.
+   *
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function getOpenidConfigurationFromIssuer(): array {
+    $endpointMap = [
+      'local' => self::TESTING_ENVIRONMENT,
+      'dev' => self::TESTING_ENVIRONMENT,
+      'test' => self::TESTING_ENVIRONMENT,
+      'testing' => self::TESTING_ENVIRONMENT,
+      'stage' => self::STAGING_ENVIRONMENT,
+      'staging' => self::STAGING_ENVIRONMENT,
+      'prod' => self::PRODUCTION_ENVIRONMENT,
+    ];
+    $base = self::STAGING_ENVIRONMENT;
+
+    $this->debugPrint('Endpoint maps: @maps', ['@maps' => Json::encode($endpointMap)]);
+
+    try {
+      // Attempt to automatically detect endpoint.
+      $env = $this->environmentResolver->getActiveEnvironmentName();
+
+      $this->debugPrint('Active environment: @maps', ['@maps' => $env]);
+
+      if (isset($endpointMap[$env])) {
+        $base = $endpointMap[$env];
+      }
+    }
+    catch (\InvalidArgumentException) {
+    }
+
+    $this->debugPrint('Enpoint selector: @maps', ['@maps' => $base]);
+
+    return Json::decode(
+      $this->httpClient->request(
+        'GET',
+        sprintf('%s/openid/.well-known/openid-configuration/', $base)
+      )->getBody()
+    );
+  }
+
+  /**
+   * Get jwks keys from issuer.
+   *
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function getJwks() {
+    $config = $this->getOpenIdConfiguration();
+
+    $response = $this->httpClient->request(
+      'GET',
+      $config["jwks_uri"]
     );
 
-    return '{
-      "myProfile": {
-          "id": "UHJvZmlsZU5vZGU6NzdhMjdhZmItMzQyNi00YTMyLTk0YjEtNzY5MWNiNjAxYmU5",
-          "firstName": "Mika",
-          "lastName": "Hietanen",
-          "nickname": "",
-          "language": "FINNISH",
-          "primaryAddress": {
-              "id": "QWRkcmVzc05vZGU6NzYxNg==",
-              "primary": true,
-              "address": "Vuorimiehenkatu 35",
-              "postalCode": "00100",
-              "city": "Helsinki",
-              "countryCode": "FI",
-              "addressType": "OTHER",
-              "__typename": "AddressNode"
-          },
-          "addresses": {
-              "edges": [
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "QWRkcmVzc05vZGU6NzYxOQ==",
-                          "address": "Mannerheimintie 37",
-                          "postalCode": "00250",
-                          "city": "Helsinki",
-                          "countryCode": "FI",
-                          "addressType": "OTHER",
-                          "__typename": "AddressNode"
-                      },
-                      "__typename": "AddressNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": true,
-                          "id": "QWRkcmVzc05vZGU6NzYxNg==",
-                          "address": "Vuorimiehenkatu 35",
-                          "postalCode": "00100",
-                          "city": "Helsinki",
-                          "countryCode": "FI",
-                          "addressType": "OTHER",
-                          "__typename": "AddressNode"
-                      },
-                      "__typename": "AddressNodeEdge"
-                  }
-              ],
-              "__typename": "AddressNodeConnection"
-          },
-          "primaryEmail": {
-              "id": "RW1haWxOb2RlOjgwNDQ=",
-              "email": "aman.yadav@anders.fi",
-              "primary": true,
-              "emailType": "NONE",
-              "__typename": "EmailNode"
-          },
-          "emails": {
-              "edges": [
-                  {
-                      "node": {
-                          "primary": true,
-                          "id": "RW1haWxOb2RlOjgwNDQ=",
-                          "email": "aman.yadav@anders.fi",
-                          "emailType": "NONE",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwNDI=",
-                          "email": "test@test.fi",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwNDA=",
-                          "email": "test@test.fi",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzk=",
-                          "email": "asdf@testi.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzg=",
-                          "email": "nizar.rahme@digia.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzc=",
-                          "email": "nizar.rahme@digia.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwNDE=",
-                          "email": "mika.hietanen@anders.fi",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  },
-                  {
-                      "node": {
-                          "primary": false,
-                          "id": "RW1haWxOb2RlOjgwMzY=",
-                          "email": "test@test.com",
-                          "emailType": "OTHER",
-                          "__typename": "EmailNode"
-                      },
-                      "__typename": "EmailNodeEdge"
-                  }
-              ],
-              "__typename": "EmailNodeConnection"
-          },
-          "primaryPhone": {
-              "id": "UGhvbmVOb2RlOjgxNzE=",
-              "phone": "+358500555333",
-              "primary": true,
-              "phoneType": "OTHER",
-              "__typename": "PhoneNode"
-          },
-          "phones": {
-              "edges": [
-                  {
-                      "node": {
-                          "primary": true,
-                          "id": "UGhvbmVOb2RlOjgxNzE=",
-                          "phone": "+358500555333",
-                          "phoneType": "OTHER",
-                          "__typename": "PhoneNode"
-                      },
-                      "__typename": "PhoneNodeEdge"
-                  }
-              ],
-              "__typename": "PhoneNodeConnection"
-          },
-          "verifiedPersonalInformation": {
-              "firstName": "Nordea",
-              "lastName": "Demo",
-              "givenName": "Nordea",
-              "nationalIdentificationNumber": "210281-9988",
-              "municipalityOfResidence": "Turku",
-              "municipalityOfResidenceNumber": "853",
-              "permanentAddress": {
-                  "streetAddress": "Mansikkatie 11",
-                  "postalCode": "20006",
-                  "postOffice": "TURKU",
-                  "__typename": "VerifiedPersonalInformationAddressNode"
-              },
-              "temporaryAddress": null,
-              "permanentForeignAddress": null,
-              "__typename": "VerifiedPersonalInformationNode"
-          },
-          "__typename": "ProfileNode"
-      }
-    }';
+    return Json::decode($response->getBody()->getContents());
+
+  }
+
+  /**
+   * Verify JWT token.
+   *
+   * @param string $jwt
+   *   JWT token.
+   *
+   * @return array
+   *   Is token valid or not.
+   *
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function verifyJwtToken(string $jwt): array {
+
+    $jwks = $this->getJwks();
+
+    $this->debugPrint('JWKS -> @jwks', ['@jwks' => Json::encode($jwks)]);
+
+    return (array) JWT::decode($jwt, JWK::parseKeySet($this->getJwks()));
+  }
+
+  /**
+   * Print debug messages.
+   *
+   * @param string $message
+   *   Message.
+   * @param array $replacements
+   *   Replacements.
+   */
+  public function debugPrint(string $message, array $replacements = []): void {
+    if ($this->isDebug()) {
+      $this->logger->debug($message, $replacements);
+    }
+  }
+
+  /**
+   * Is debug on?
+   *
+   * @return bool
+   *   Debug boolean.
+   */
+  public function isDebug(): bool {
+    return $this->debug;
+  }
+
+  /**
+   * Set debug value.
+   *
+   * @param bool $debug
+   *   Debug boolean value.
+   */
+  public function setDebug(bool $debug): void {
+    $this->debug = $debug;
   }
 
 }
