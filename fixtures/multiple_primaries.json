@@ -1,0 +1,87 @@
+{
+  "myProfile": {
+    "id": "UHJvZmlsZU5vZGU6NzdhMjdhZmItMzQyNi00YTMyLTk0YjEtNzY5MWNiNjAxYmU5",
+    "firstName": "Nordea",
+    "lastName": "Demo",
+    "nickname": "",
+    "language": "FINNISH",
+    "primaryAddress": null,
+    "addresses": { "edges": [] },
+    "primaryEmail": null,
+    "emails": {
+      "edges": [
+        {
+          "node": {
+            "primary": false,
+            "id": "RW1haWxOb2RlOjg1NDk=",
+            "email": "nonprimary@test.test",
+            "emailType": "NONE",
+            "verified": true
+          }
+        },
+        {
+          "node": {
+            "primary": true,
+            "id": "AD3Xb2RlOjg1Dz=",
+            "email": "primary@test.test",
+            "emailType": "NONE",
+            "verified": true
+          }
+        },
+        {
+          "node": {
+            "primary": true,
+            "id": "AD3Xb2RlOjg1Dz=",
+            "email": "primary2@test.test",
+            "emailType": "NONE",
+            "verified": true
+          }
+        }
+      ]
+    },
+    "primaryPhone": null,
+    "phones": {
+      "edges": [
+        {
+          "node": {
+            "primary": false,
+            "id": "UGhvbmVOb2RlOjgzNDY=",
+            "phone": "+358123123123",
+            "phoneType": "OTHER"
+          }
+        },
+        {
+          "node": {
+            "primary": true,
+            "id": "ZhvbmVOb2RlOjgzNDY=",
+            "phone": "+358111111111",
+            "phoneType": "OTHER"
+          }
+        },
+        {
+          "node": {
+            "primary": true,
+            "id": "ZhvbmVOb2RlOjgzNDY=",
+            "phone": "+35833333333333",
+            "phoneType": "OTHER"
+          }
+        }
+      ]
+    },
+    "verifiedPersonalInformation": {
+      "firstName": "Nordea",
+      "lastName": "Demo",
+      "givenName": "Nordea",
+      "nationalIdentificationNumber": "210281-9988",
+      "municipalityOfResidence": "Turku",
+      "municipalityOfResidenceNumber": "853",
+      "permanentAddress": {
+        "streetAddress": "Mansikkatie 11",
+        "postalCode": "20006",
+        "postOffice": "TURKU",
+        "temporaryAddress": null,
+        "permanentForeignAddress": null
+      }
+    }
+  }
+}
