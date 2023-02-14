@@ -1,0 +1,58 @@
+{
+  "myProfile": {
+    "id": "UHJvZmlsZU5vZGU6NzdhMjdhZmItMzQyNi00YTMyLTk0YjEtNzY5MWNiNjAxYmU5",
+    "firstName": "Nordea",
+    "lastName": "Demo",
+    "nickname": "",
+    "language": "FINNISH",
+    "primaryAddress": null,
+    "addresses": { "edges": [] },
+    "primaryEmail": { "id": "RW1haWxOb2RlOjg1NDk=",
+    "email": "test@test.test",
+    "primary": true,
+    "emailType": "NONE",
+    "verified": true
+    },
+    "emails": {
+      "edges": [
+        {
+          "node": {
+            "primary": true,
+            "id": "RW1haWxOb2RlOjg1NDk=",
+            "email": "test2@test.test",
+            "emailType": "NONE",
+            "verified": true
+          }
+        }
+      ]
+    },
+    "primaryPhone": null,
+    "phones": {
+      "edges": [
+        {
+          "node": {
+            "primary": false,
+            "id": "UGhvbmVOb2RlOjgzNDY=",
+            "phone": "+35823524512352345",
+            "phoneType": "OTHER"
+          }
+        }
+      ]
+    },
+    "verifiedPersonalInformation": {
+      "firstName": "Nordea <script>alert(1)</script>",
+      "lastName": "Demo",
+      "givenName": "Nordea",
+      "nationalIdentificationNumber": "210281-9988",
+      "municipalityOfResidence": "Turku",
+      "municipalityOfResidenceNumber": "853",
+      "permanentAddress": {
+        "streetAddress": "Mansikkatie 11",
+        "postalCode": "20006",
+        "postOffice": "TURKU",
+        "temporaryAddress": null,
+        "permanentForeignAddress": null
+      }
+    }
+  }
+}

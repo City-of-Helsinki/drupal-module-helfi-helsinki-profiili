@@ -342,18 +342,9 @@ class HelsinkiProfiiliUserData {
           '%user' => $this->currentUser->getDisplayName(),
         ]);
       }
-      // Make sure that data coming from HP is sanitized and does not contain
-      // anything worth removing.
-      array_walk_recursive(
-        $data,
-        function (&$item) {
-          if (is_string($item)) {
-            $item = Xss::filter($item);
-          }
-        }
-      );
 
-      $modifiedData = $this->checkPrimaryFields($data);
+      $filteredData = $this->filterData($data);
+      $modifiedData = $this->checkPrimaryFields($filteredData);
 
       // Set profile data to cache so that no need to fetch more data.
       $this->setToCache('myProfile', $modifiedData);
@@ -636,7 +627,7 @@ class HelsinkiProfiiliUserData {
    * @return array
    *   Modified array
    */
-  private function checkPrimaryFields(array $data): array {
+  public function checkPrimaryFields(array $data): array {
 
     static $fieldMapping = [
       'phone' => [
@@ -690,6 +681,29 @@ class HelsinkiProfiiliUserData {
 
     return $data;
 
+  }
+
+  /**
+   * Runs the array items through Xss::filter function.
+   * @param array $data
+   * Input array.
+   *
+   * @return array
+   * Filtered data.
+   */
+  public function filterData(array $data) {
+    // Make sure that data coming from HP is sanitized and does not contain
+    // anything worth removing.
+    array_walk_recursive(
+      $data,
+      function (&$item) {
+        if (is_string($item)) {
+          $item = Xss::filter($item);
+        }
+      }
+    );
+
+    return $data;
   }
 
   /**
