@@ -113,6 +113,13 @@ class HelsinkiProfiiliUserData {
    */
   protected bool $debug;
 
+    /**
+   * Endpoint for api tokens.
+   *
+   * @var string
+   */
+  protected string $apiTokenEndpoint;
+
   /**
    * Constructs a HelsinkiProfiiliUser object.
    *
@@ -162,6 +169,9 @@ class HelsinkiProfiiliUserData {
     else {
       $this->hpAdminRoles = [];
     }
+
+        // Set api endpoint url.
+        $this->setApiTokenEndpoint(getenv('TUNNISTAMO_API_TOKEN_ENDPOINT'));
 
     $debug = getenv('DEBUG');
 
@@ -865,6 +875,26 @@ class HelsinkiProfiiliUserData {
    */
   public function setDebug(bool $debug): void {
     $this->debug = $debug;
+  }
+
+  /**
+   * Get api endpoint for apikeys.
+   *
+   * @return string
+   *   Endpoint url
+   */
+  public function getApiTokenEndpoint(): string {
+    return $this->apiTokenEndpoint;
+  }
+
+  /**
+   * Set api endpoint.
+   *
+   * @param string $apiTokenEndpoint
+   *   Endpoint url.
+   */
+  public function setApiTokenEndpoint(string $apiTokenEndpoint): void {
+    $this->apiTokenEndpoint = $apiTokenEndpoint;
   }
 
 }
