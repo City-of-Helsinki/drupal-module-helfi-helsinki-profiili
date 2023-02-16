@@ -410,7 +410,7 @@ class HelsinkiProfiiliUserData {
    */
   private function getHelsinkiProfiiliToken(string $accessToken): ?array {
     try {
-      $response = $this->httpClient->request('GET', 'https://tunnistamo.test.hel.ninja/api-tokens/', [
+      $response = $this->httpClient->request('GET', $this->getApiTokenEndpoint(), [
         'headers' => [
           'Authorization' => 'Bearer ' . $accessToken,
         ],
