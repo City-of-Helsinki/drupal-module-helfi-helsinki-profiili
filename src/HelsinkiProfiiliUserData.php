@@ -114,6 +114,13 @@ class HelsinkiProfiiliUserData {
   protected bool $debug;
 
   /**
+   * Endpoint for api tokens.
+   *
+   * @var string
+   */
+  protected string $apiTokenEndpoint;
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -162,6 +169,9 @@ class HelsinkiProfiiliUserData {
     else {
       $this->hpAdminRoles = [];
     }
+
+    // Set api endpoint url.
+    $this->setApiTokenEndpoint(getenv('TUNNISTAMO_API_TOKEN_ENDPOINT'));
 
     $debug = getenv('DEBUG');
 
@@ -342,9 +352,18 @@ class HelsinkiProfiiliUserData {
           '%user' => $this->currentUser->getDisplayName(),
         ]);
       }
+      // Make sure that data coming from HP is sanitized and does not contain
+      // anything worth removing.
+      array_walk_recursive(
+        $data,
+        function (&$item) {
+          if (is_string($item)) {
+            $item = Xss::filter($item);
+          }
+        }
+      );
 
-      $filteredData = $this->filterData($data);
-      $modifiedData = $this->checkPrimaryFields($filteredData);
+      $modifiedData = $this->checkPrimaryFields($data);
 
       // Set profile data to cache so that no need to fetch more data.
       $this->setToCache('myProfile', $modifiedData);
@@ -400,7 +419,8 @@ class HelsinkiProfiiliUserData {
    */
   private function getHelsinkiProfiiliToken(string $accessToken): ?array {
     try {
-      $response = $this->httpClient->request('GET', 'https://tunnistamo.test.hel.ninja/api-tokens/', [
+
+      $response = $this->httpClient->request('GET', $this->getApiTokenEndpoint(), [
         'headers' => [
           'Authorization' => 'Bearer ' . $accessToken,
         ],
@@ -619,15 +639,12 @@ class HelsinkiProfiiliUserData {
    * Fill primaryPhone field from edge nodes, if it is missing.
    *
    * @param array $data
-   *   Data array
-   *
-   * @param string $field
-   *   Field to check (email | phone)
+   *   Data array.
    *
    * @return array
    *   Modified array
    */
-  public function checkPrimaryFields(array $data): array {
+  private function checkPrimaryFields(array $data): array {
 
     static $fieldMapping = [
       'phone' => [
@@ -641,24 +658,23 @@ class HelsinkiProfiiliUserData {
       'address' => [
         'primary_field_key' => 'primaryAddress',
         'field_key' => 'addresses',
-      ]
+      ],
     ];
 
+    foreach ($fieldMapping as $mapping) {
 
-    foreach($fieldMapping as $mapping) {
-
-      list(
+      [
         'primary_field_key' => $primaryFieldKey,
         'field_key' => $fieldKey,
-      ) = $mapping;
+      ] = $mapping;
 
       $primaryField = $data['myProfile'][$primaryFieldKey];
       if ($primaryField === NULL) {
 
         /*
-        * Loop the edges. Get first node with verified flag, or
-        * the first edge if none is verified.
-        */
+         * Loop the edges. Get first node with verified flag, or
+         * the first edge if none is verified.
+         */
         foreach ($data['myProfile'][$fieldKey]['edges'] as $edge) {
           if ($edge['node']['primary']) {
             $primaryField = $edge['node'];
@@ -681,29 +697,6 @@ class HelsinkiProfiiliUserData {
 
     return $data;
 
-  }
-
-  /**
-   * Runs the array items through Xss::filter function.
-   * @param array $data
-   * Input array.
-   *
-   * @return array
-   * Filtered data.
-   */
-  public function filterData(array $data) {
-    // Make sure that data coming from HP is sanitized and does not contain
-    // anything worth removing.
-    array_walk_recursive(
-      $data,
-      function (&$item) {
-        if (is_string($item)) {
-          $item = Xss::filter($item);
-        }
-      }
-    );
-
-    return $data;
   }
 
   /**
@@ -865,6 +858,26 @@ class HelsinkiProfiiliUserData {
    */
   public function setDebug(bool $debug): void {
     $this->debug = $debug;
+  }
+
+  /**
+   * Get api endpoint for apikeys.
+   *
+   * @return string
+   *   Endpoint url
+   */
+  public function getApiTokenEndpoint(): string {
+    return $this->apiTokenEndpoint;
+  }
+
+  /**
+   * Set api endpoint.
+   *
+   * @param string $apiTokenEndpoint
+   *   Endpoint url.
+   */
+  public function setApiTokenEndpoint(string $apiTokenEndpoint): void {
+    $this->apiTokenEndpoint = $apiTokenEndpoint;
   }
 
 }
