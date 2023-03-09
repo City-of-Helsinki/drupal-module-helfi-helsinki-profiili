@@ -51,6 +51,13 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
   $rolesConfig = $config->get('roles');
   $clientsConfig = $config->get('clients');
 
+  $session = \Drupal::request()->getSession();
+  $session->set('openid_connect_plugin_id', $context["plugin_id"]);
+  if (isset($context['tokens']['refresh_token'])) {
+    $session->set('openid_connect_refresh_token', $context['tokens']['refresh_token']);
+    $session->set('openid_connect_expire', $context['tokens']['expire']);
+  }
+
   try {
     if ($context["plugin_id"] == $clientsConfig["hp_user_client"]) {
       // Add strong auth for strong auth and weak for other.

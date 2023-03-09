@@ -7,7 +7,8 @@ services:
       '@logger.factory',
       '@current_user',
       '@request_stack',
-      '@helfi_api_base.environment_resolver'
+      '@helfi_api_base.environment_resolver',
+      '@entity_type.manager'
     ]
 
   helfi_helsinki_profiili.middleware:
