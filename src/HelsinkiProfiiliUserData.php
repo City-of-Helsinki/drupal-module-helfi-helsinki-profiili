@@ -4,6 +4,7 @@ namespace Drupal\helfi_helsinki_profiili;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -93,6 +94,13 @@ class HelsinkiProfiiliUserData {
   private EnvironmentResolverInterface $environmentResolver;
 
   /**
+   * The entity type manager.
+   *
+   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
+   */
+  private EntityTypeManagerInterface $entityManager;
+
+  /**
    * Store details about oidc issuer.
    *
    * @var array
@@ -135,6 +143,8 @@ class HelsinkiProfiiliUserData {
    *   Access session store.
    * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
    *   Where are we?
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
@@ -142,7 +152,9 @@ class HelsinkiProfiiliUserData {
     LoggerChannelFactoryInterface $logger_factory,
     AccountProxyInterface $currentUser,
     RequestStack $requestStack,
-    EnvironmentResolverInterface $environmentResolver) {
+    EnvironmentResolverInterface $environmentResolver,
+    EntityTypeManagerInterface $entityTypeManager
+    ) {
 
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
@@ -151,6 +163,7 @@ class HelsinkiProfiiliUserData {
     $this->logger = $logger_factory->get('helsinki_profiili');
     $this->currentUser = $currentUser;
     $this->requestStack = $requestStack;
+    $this->entityManager = $entityTypeManager;
 
     $this->openIdConfiguration = [];
 
@@ -822,6 +835,74 @@ class HelsinkiProfiiliUserData {
     return Json::decode($response->getBody()->getContents());
 
   }
+
+  /**
+  * {@inheritdoc}
+  */
+ public function refreshTokens() {
+
+  $session = $this->requestStack->getCurrentRequest()->getSession();
+  $refresh_token = $session->get('openid_connect_refresh_token');
+  $plugin_id =  \Drupal::request()->getSession()->get('openid_connect_plugin_id');
+
+  $storage = $this->entityManager->getStorage('openid_connect_client');
+  $entities  = $storage->loadByProperties(['plugin' => 'tunnistamo', 'id' => $plugin_id]);
+
+  if (!isset($entities[$plugin_id])) {
+    return FALSE;
+  }
+
+  $client = $entities[$plugin_id];
+  $configuration = $client->getPlugin()->getConfiguration();
+
+   // Exchange a refresh token for new tokens.
+   $endpoints = $this->getOpenIdConfiguration();
+   $request_options = [
+     'form_params' => [
+       'refresh_token' => $refresh_token,
+       'client_id' => $configuration['client_id'],
+       'client_secret' => $configuration['client_secret'],
+       'grant_type' => 'refresh_token',
+     ],
+     'headers' => [
+       'Accept' => 'application/json',
+     ],
+   ];
+
+   try {
+     $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
+     $response_data = json_decode((string) $response->getBody(), TRUE);
+     // Expected result.
+     $tokens = [
+       'id_token' => isset($response_data['id_token']) ? $response_data['id_token'] : NULL,
+       'access_token' => isset($response_data['access_token']) ? $response_data['access_token'] : NULL,
+     ];
+
+     $this->openidConnectSession->saveIdToken($tokens['id_token']);
+     $this->openidConnectSession->saveAccessToken($tokens['access_token']);
+
+     if (array_key_exists('expires_in', $response_data)) {
+       $tokens['expire'] = REQUEST_TIME + $response_data['expires_in'];
+       $session->set('openid_connect_expire', $tokens['expire']);
+     }
+     if (array_key_exists('refresh_token', $response_data)) {
+       $tokens['refresh_token'] = $response_data['refresh_token'];
+       $session->set('openid_connect_refresh_token', $response_data['refresh_token']);
+     }
+     return $tokens;
+   }
+   catch (\Exception $e) {
+     $variables = [
+       '@message' => 'Could not refresh tokens',
+       '@error_message' => $e->getMessage(),
+     ];
+     $this->logger->error(
+      '@message: @error_message',
+      $variables
+    );
+     return FALSE;
+   }
+ }
 
   /**
    * Verify JWT token.
