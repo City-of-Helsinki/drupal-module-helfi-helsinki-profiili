@@ -10,6 +10,7 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
+use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
 use Drupal\openid_connect\OpenIDConnectSession;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
@@ -17,6 +18,7 @@ use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
@@ -121,12 +123,19 @@ class HelsinkiProfiiliUserData {
    */
   protected bool $debug;
 
-    /**
+  /**
    * Endpoint for api tokens.
    *
    * @var string
    */
   protected string $apiTokenEndpoint;
+
+  /**
+   * The event dispatcher service.
+   *
+   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
+   */
+  protected EventDispatcherInterface $eventDispatcher;
 
   /**
    * Constructs a HelsinkiProfiiliUser object.
@@ -153,7 +162,8 @@ class HelsinkiProfiiliUserData {
     AccountProxyInterface $currentUser,
     RequestStack $requestStack,
     EnvironmentResolverInterface $environmentResolver,
-    EntityTypeManagerInterface $entityTypeManager
+    EntityTypeManagerInterface $entityTypeManager,
+    EventDispatcherInterface $eventDispatcher
     ) {
 
     $this->openidConnectSession = $openid_connect_session;
@@ -161,6 +171,7 @@ class HelsinkiProfiiliUserData {
     $this->environmentResolver = $environmentResolver;
 
     $this->logger = $logger_factory->get('helsinki_profiili');
+    $this->eventDispatcher = $eventDispatcher;
     $this->currentUser = $currentUser;
     $this->requestStack = $requestStack;
     $this->entityManager = $entityTypeManager;
@@ -183,8 +194,8 @@ class HelsinkiProfiiliUserData {
       $this->hpAdminRoles = [];
     }
 
-        // Set api endpoint url.
-        $this->setApiTokenEndpoint(getenv('TUNNISTAMO_API_TOKEN_ENDPOINT'));
+    // Set api endpoint url.
+    $this->setApiTokenEndpoint(getenv('TUNNISTAMO_API_TOKEN_ENDPOINT'));
 
     $debug = getenv('DEBUG');
 
@@ -376,6 +387,7 @@ class HelsinkiProfiiliUserData {
     }
     catch (ClientException | ServerException $e) {
 
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
         [
@@ -388,6 +400,7 @@ class HelsinkiProfiiliUserData {
 
     }
     catch (TempStoreException $e) {
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         'Caching userprofile data failed',
         [
@@ -397,8 +410,10 @@ class HelsinkiProfiiliUserData {
           );
     }
     catch (GuzzleException $e) {
+      $this->dispatchExceptionEvent($e);
     }
     catch (ProfileDataException $e) {
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         $e->getMessage()
           );
@@ -436,10 +451,12 @@ class HelsinkiProfiiliUserData {
       return Json::decode($body);
     }
     catch (ProfileDataException $profileDataException) {
+      $this->dispatchExceptionEvent($profileDataException);
       $this->logger->error('Trying to get tokens from api-tokens endpoint, got empty body: @error', ['@error' => $profileDataException->getMessage()]);
       return NULL;
     }
     catch (GuzzleException | \Exception $e) {
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
@@ -584,6 +601,7 @@ class HelsinkiProfiiliUserData {
       return TRUE;
     }
     catch (\Exception $e) {
+      $this->dispatchExceptionEvent($e);
       return FALSE;
     }
   }
@@ -806,7 +824,8 @@ class HelsinkiProfiiliUserData {
         $base = $endpointMap[$env];
       }
     }
-    catch (\InvalidArgumentException) {
+    catch (\InvalidArgumentException $e) {
+      $this->dispatchExceptionEvent($e);
     }
 
     $this->debugPrint('Enpoint selector: @maps', ['@maps' => $base]);
@@ -892,15 +911,16 @@ class HelsinkiProfiiliUserData {
      return $tokens;
    }
    catch (\Exception $e) {
-     $variables = [
-       '@message' => 'Could not refresh tokens',
-       '@error_message' => $e->getMessage(),
-     ];
-     $this->logger->error(
+    $this->dispatchExceptionEvent($e);
+    $variables = [
+      '@message' => 'Could not refresh tokens',
+      '@error_message' => $e->getMessage(),
+    ];
+    $this->logger->error(
       '@message: @error_message',
-      $variables
+       $variables
     );
-     return FALSE;
+    return FALSE;
    }
  }
 
@@ -976,6 +996,17 @@ class HelsinkiProfiiliUserData {
    */
   public function setApiTokenEndpoint(string $apiTokenEndpoint): void {
     $this->apiTokenEndpoint = $apiTokenEndpoint;
+  }
+
+  /**
+   * Dispatches exception event.
+   *
+   * @param \Exception $exception
+   *   The exception
+   */
+  private function dispatchExceptionEvent($exception) {
+    $event = new HelsinkiProfiiliExceptionEvent($exception);
+    $this->eventDispatcher->dispatch(HelsinkiProfiiliExceptionEvent::EVENT_ID, $event);
   }
 
 }
