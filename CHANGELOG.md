@@ -1,5 +1,6 @@
 # Chanelog
 
+## 0.9.8
 ## 0.9.7
 affd9b1 feat: LOM-434: Exception audit logs (#10)
 8375a2d feat: LOM-249: Add token refresh functionality
