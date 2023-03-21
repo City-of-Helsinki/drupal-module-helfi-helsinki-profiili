@@ -8,7 +8,7 @@ services:
       '@current_user',
       '@request_stack',
       '@helfi_api_base.environment_resolver',
-      '@entity_type.manager'
+      '@entity_type.manager',
       '@event_dispatcher'
     ]
 
