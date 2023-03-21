@@ -3,7 +3,11 @@
     "type": "drupal-module",
     "license": "GPL-2.0-or-later",
     "minimum-stability": "dev",
+<<<<<<< HEAD
     "version": "0.9.6",
+=======
+    "version": "0.9.7",
+>>>>>>> release/0.9.7
     "autoload": {
         "psr-4": {
             "Drupal\\HelfiHelsinkiProfiili\\": "src/"

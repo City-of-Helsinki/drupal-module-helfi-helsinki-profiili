@@ -10,6 +10,7 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
+use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
 use Drupal\openid_connect\OpenIDConnectSession;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
@@ -17,6 +18,7 @@ use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
@@ -33,21 +35,21 @@ class HelsinkiProfiiliUserData {
   /**
    * The openid_connect.session service.
    *
-   * @var \Drupal\openid_connect\OpenIDConnectSession
+   * @var OpenIDConnectSession
    */
   protected OpenIDConnectSession $openidConnectSession;
 
   /**
    * The HTTP client.
    *
-   * @var \GuzzleHttp\ClientInterface
+   * @var ClientInterface
    */
   protected ClientInterface $httpClient;
 
   /**
    * The logger channel factory.
    *
-   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   * @var LoggerChannelFactoryInterface
    */
   protected $logger;
 
@@ -61,14 +63,14 @@ class HelsinkiProfiiliUserData {
   /**
    * Drupal\Core\Session\AccountProxyInterface definition.
    *
-   * @var \Drupal\Core\Session\AccountProxyInterface
+   * @var AccountProxyInterface
    */
   protected AccountProxyInterface $currentUser;
 
   /**
    * Request stack for session access.
    *
-   * @var \Drupal\Core\Http\RequestStack
+   * @var RequestStack
    */
   protected RequestStack $requestStack;
 
@@ -89,14 +91,14 @@ class HelsinkiProfiiliUserData {
   /**
    * The environment resolver.
    *
-   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
+   * @var EnvironmentResolverInterface
    */
   private EnvironmentResolverInterface $environmentResolver;
 
   /**
    * The entity type manager.
    *
-   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
+   * @var EnvironmentResolverInterface
    */
   private EntityTypeManagerInterface $entityManager;
 
@@ -121,7 +123,7 @@ class HelsinkiProfiiliUserData {
    */
   protected bool $debug;
 
-    /**
+  /**
    * Endpoint for api tokens.
    *
    * @var string
@@ -129,22 +131,31 @@ class HelsinkiProfiiliUserData {
   protected string $apiTokenEndpoint;
 
   /**
+   * The event dispatcher service.
+   *
+   * @var EventDispatcherInterface
+   */
+  protected EventDispatcherInterface $eventDispatcher;
+
+  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
-   * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
+   * @param OpenIDConnectSession $openid_connect_session
    *   The openid_connect.session service.
-   * @param \GuzzleHttp\ClientInterface $http_client
+   * @param ClientInterface $http_client
    *   The HTTP client.
-   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
+   * @param LoggerChannelFactoryInterface $logger_factory
    *   The logger channel factory.
-   * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
+   * @param AccountProxyInterface $currentUser
    *   Current user session.
-   * @param \Drupal\Core\Http\RequestStack $requestStack
+   * @param RequestStack $requestStack
    *   Access session store.
-   * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
+   * @param EnvironmentResolverInterface $environmentResolver
    *   Where are we?
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   * @param EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
+   * @param EventDispatcherInterface $eventDispatcher
+   *   Dispatch events.
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
@@ -153,7 +164,8 @@ class HelsinkiProfiiliUserData {
     AccountProxyInterface $currentUser,
     RequestStack $requestStack,
     EnvironmentResolverInterface $environmentResolver,
-    EntityTypeManagerInterface $entityTypeManager
+    EntityTypeManagerInterface $entityTypeManager,
+    EventDispatcherInterface $eventDispatcher
     ) {
 
     $this->openidConnectSession = $openid_connect_session;
@@ -161,6 +173,7 @@ class HelsinkiProfiiliUserData {
     $this->environmentResolver = $environmentResolver;
 
     $this->logger = $logger_factory->get('helsinki_profiili');
+    $this->eventDispatcher = $eventDispatcher;
     $this->currentUser = $currentUser;
     $this->requestStack = $requestStack;
     $this->entityManager = $entityTypeManager;
@@ -183,8 +196,8 @@ class HelsinkiProfiiliUserData {
       $this->hpAdminRoles = [];
     }
 
-        // Set api endpoint url.
-        $this->setApiTokenEndpoint(getenv('TUNNISTAMO_API_TOKEN_ENDPOINT'));
+    // Set api endpoint url.
+    $this->setApiTokenEndpoint(getenv('TUNNISTAMO_API_TOKEN_ENDPOINT'));
 
     $debug = getenv('DEBUG');
 
@@ -376,6 +389,7 @@ class HelsinkiProfiiliUserData {
     }
     catch (ClientException | ServerException $e) {
 
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         '/userinfo endpoint threw errorcode %ecode: @error',
         [
@@ -388,6 +402,7 @@ class HelsinkiProfiiliUserData {
 
     }
     catch (TempStoreException $e) {
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         'Caching userprofile data failed',
         [
@@ -397,8 +412,10 @@ class HelsinkiProfiiliUserData {
           );
     }
     catch (GuzzleException $e) {
+      $this->dispatchExceptionEvent($e);
     }
     catch (ProfileDataException $e) {
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         $e->getMessage()
           );
@@ -436,10 +453,12 @@ class HelsinkiProfiiliUserData {
       return Json::decode($body);
     }
     catch (ProfileDataException $profileDataException) {
+      $this->dispatchExceptionEvent($profileDataException);
       $this->logger->error('Trying to get tokens from api-tokens endpoint, got empty body: @error', ['@error' => $profileDataException->getMessage()]);
       return NULL;
     }
     catch (GuzzleException | \Exception $e) {
+      $this->dispatchExceptionEvent($e);
       $this->logger->error(
         'Error retrieving access token %ecode: @error',
         [
@@ -584,6 +603,7 @@ class HelsinkiProfiiliUserData {
       return TRUE;
     }
     catch (\Exception $e) {
+      $this->dispatchExceptionEvent($e);
       return FALSE;
     }
   }
@@ -642,10 +662,7 @@ class HelsinkiProfiiliUserData {
    * Fill primaryPhone field from edge nodes, if it is missing.
    *
    * @param array $data
-   *   Data array
-   *
-   * @param string $field
-   *   Field to check (email | phone)
+   *   Data array.
    *
    * @return array
    *   Modified array
@@ -664,24 +681,23 @@ class HelsinkiProfiiliUserData {
       'address' => [
         'primary_field_key' => 'primaryAddress',
         'field_key' => 'addresses',
-      ]
+      ],
     ];
 
+    foreach ($fieldMapping as $mapping) {
 
-    foreach($fieldMapping as $mapping) {
-
-      list(
+      [
         'primary_field_key' => $primaryFieldKey,
         'field_key' => $fieldKey,
-      ) = $mapping;
+      ] = $mapping;
 
       $primaryField = $data['myProfile'][$primaryFieldKey];
       if ($primaryField === NULL) {
 
         /*
-        * Loop the edges. Get first node with verified flag, or
-        * the first edge if none is verified.
-        */
+         * Loop the edges. Get first node with verified flag, or
+         * the first edge if none is verified.
+         */
         foreach ($data['myProfile'][$fieldKey]['edges'] as $edge) {
           if ($edge['node']['primary']) {
             $primaryField = $edge['node'];
@@ -708,11 +724,12 @@ class HelsinkiProfiiliUserData {
 
   /**
    * Runs the array items through Xss::filter function.
+   *
    * @param array $data
-   * Input array.
+   *   Input array.
    *
    * @return array
-   * Filtered data.
+   *   Filtered data.
    */
   public function filterData(array $data) {
     // Make sure that data coming from HP is sanitized and does not contain
@@ -732,7 +749,7 @@ class HelsinkiProfiiliUserData {
   /**
    * Get current user data.
    *
-   * @return \Drupal\Core\Session\AccountProxyInterface
+   * @return AccountProxyInterface
    *   Current user.
    */
   public function getCurrentUser(): AccountProxyInterface {
@@ -806,7 +823,8 @@ class HelsinkiProfiiliUserData {
         $base = $endpointMap[$env];
       }
     }
-    catch (\InvalidArgumentException) {
+    catch (\InvalidArgumentException $e) {
+      $this->dispatchExceptionEvent($e);
     }
 
     $this->debugPrint('Enpoint selector: @maps', ['@maps' => $base]);
@@ -837,72 +855,76 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-  * {@inheritdoc}
-  */
- public function refreshTokens() {
+   * {@inheritdoc}
+   */
+  public function refreshTokens() {
 
-  $session = $this->requestStack->getCurrentRequest()->getSession();
-  $refresh_token = $session->get('openid_connect_refresh_token');
-  $plugin_id =  \Drupal::request()->getSession()->get('openid_connect_plugin_id');
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+    $refresh_token = $session->get('openid_connect_refresh_token');
+    $plugin_id = \Drupal::request()->getSession()->get('openid_connect_plugin_id');
 
-  $storage = $this->entityManager->getStorage('openid_connect_client');
-  $entities  = $storage->loadByProperties(['plugin' => 'tunnistamo', 'id' => $plugin_id]);
+    $storage = $this->entityManager->getStorage('openid_connect_client');
+    $entities = $storage->loadByProperties([
+      'plugin' => 'tunnistamo',
+      'id' => $plugin_id,
+    ]);
 
-  if (!isset($entities[$plugin_id])) {
-    return FALSE;
-  }
+    if (!isset($entities[$plugin_id])) {
+      return FALSE;
+    }
 
-  $client = $entities[$plugin_id];
-  $configuration = $client->getPlugin()->getConfiguration();
+    $client = $entities[$plugin_id];
+    $configuration = $client->getPlugin()->getConfiguration();
 
-   // Exchange a refresh token for new tokens.
-   $endpoints = $this->getOpenIdConfiguration();
-   $request_options = [
-     'form_params' => [
-       'refresh_token' => $refresh_token,
-       'client_id' => $configuration['client_id'],
-       'client_secret' => $configuration['client_secret'],
-       'grant_type' => 'refresh_token',
-     ],
-     'headers' => [
-       'Accept' => 'application/json',
-     ],
-   ];
+    // Exchange a refresh token for new tokens.
+    $endpoints = $this->getOpenIdConfiguration();
+    $request_options = [
+      'form_params' => [
+        'refresh_token' => $refresh_token,
+        'client_id' => $configuration['client_id'],
+        'client_secret' => $configuration['client_secret'],
+        'grant_type' => 'refresh_token',
+      ],
+      'headers' => [
+        'Accept' => 'application/json',
+      ],
+    ];
 
-   try {
-     $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
-     $response_data = json_decode((string) $response->getBody(), TRUE);
-     // Expected result.
-     $tokens = [
-       'id_token' => isset($response_data['id_token']) ? $response_data['id_token'] : NULL,
-       'access_token' => isset($response_data['access_token']) ? $response_data['access_token'] : NULL,
-     ];
+    try {
+      $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
+      $response_data = json_decode((string) $response->getBody(), TRUE);
+      // Expected result.
+      $tokens = [
+        'id_token' => $response_data['id_token'] ?? NULL,
+        'access_token' => $response_data['access_token'] ?? NULL,
+      ];
 
-     $this->openidConnectSession->saveIdToken($tokens['id_token']);
-     $this->openidConnectSession->saveAccessToken($tokens['access_token']);
+      $this->openidConnectSession->saveIdToken($tokens['id_token']);
+      $this->openidConnectSession->saveAccessToken($tokens['access_token']);
 
-     if (array_key_exists('expires_in', $response_data)) {
-       $tokens['expire'] = REQUEST_TIME + $response_data['expires_in'];
-       $session->set('openid_connect_expire', $tokens['expire']);
-     }
-     if (array_key_exists('refresh_token', $response_data)) {
-       $tokens['refresh_token'] = $response_data['refresh_token'];
-       $session->set('openid_connect_refresh_token', $response_data['refresh_token']);
-     }
-     return $tokens;
-   }
-   catch (\Exception $e) {
-     $variables = [
-       '@message' => 'Could not refresh tokens',
-       '@error_message' => $e->getMessage(),
-     ];
-     $this->logger->error(
+      if (array_key_exists('expires_in', $response_data)) {
+        $tokens['expire'] = REQUEST_TIME + $response_data['expires_in'];
+        $session->set('openid_connect_expire', $tokens['expire']);
+      }
+      if (array_key_exists('refresh_token', $response_data)) {
+        $tokens['refresh_token'] = $response_data['refresh_token'];
+        $session->set('openid_connect_refresh_token', $response_data['refresh_token']);
+      }
+      return $tokens;
+    }
+    catch (\Exception $e) {
+      $this->dispatchExceptionEvent($e);
+      $variables = [
+        '@message' => 'Could not refresh tokens',
+        '@error_message' => $e->getMessage(),
+      ];
+      $this->logger->error(
       '@message: @error_message',
-      $variables
-    );
-     return FALSE;
-   }
- }
+       $variables
+      );
+      return FALSE;
+    }
+  }
 
   /**
    * Verify JWT token.
@@ -976,6 +998,17 @@ class HelsinkiProfiiliUserData {
    */
   public function setApiTokenEndpoint(string $apiTokenEndpoint): void {
     $this->apiTokenEndpoint = $apiTokenEndpoint;
+  }
+
+  /**
+   * Dispatches exception event.
+   *
+   * @param \Exception $exception
+   *   The exception.
+   */
+  private function dispatchExceptionEvent(\Exception $exception): void {
+    $event = new HelsinkiProfiiliExceptionEvent($exception);
+    $this->eventDispatcher->dispatch(HelsinkiProfiiliExceptionEvent::EVENT_ID, $event);
   }
 
 }

@@ -8,7 +8,8 @@ services:
       '@current_user',
       '@request_stack',
       '@helfi_api_base.environment_resolver',
-      '@entity_type.manager'
+      '@entity_type.manager',
+      '@event_dispatcher'
     ]
 
   helfi_helsinki_profiili.middleware:
@@ -20,5 +21,9 @@ services:
   helfi_helsinki_profiili.token_event_subscriber:
     class: Drupal\helfi_helsinki_profiili\EventSubscriber\TokenExpiredExceptionSubscriber
     arguments: ['@messenger']
+    tags:
+      - { name: event_subscriber }
+  helfi_helsinki_profiili.exception_event_subscriber:
+    class: Drupal\helfi_helsinki_profiili\EventSubscriber\HelsinkiProfiiliExceptionEventSubscriber
     tags:
       - { name: event_subscriber }
