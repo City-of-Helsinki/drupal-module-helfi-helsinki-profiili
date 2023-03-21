@@ -16,7 +16,6 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Http\RequestStack;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 
-
 /**
  * Tests HelsinkiProfiiliUserData class.
  *
@@ -67,7 +66,7 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
   }
 
   /**
-   * Loads fixture json and returns it
+   * Loads fixture json and returns it.
    *
    * @param string $file
    *   Fila name.
@@ -95,8 +94,9 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
   }
 
   /**
-   * Tests that function returns first node, incase no primary
-   * nodes are available.
+   * Tests that function returns first node.
+   *
+   * Incase no primary nodes are available.
    *
    * @covers ::checkPrimaryFields
    */
@@ -108,8 +108,9 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
   }
 
   /**
-   * Tests that function doesn't change primaryFields if there is
-   * non-null value already.
+   * Tests that function doesn't change primaryFields.
+   *
+   * If there is non-null value already.
    *
    * @covers ::checkPrimaryFields
    */
@@ -122,7 +123,7 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
   }
 
   /**
-   * Tests that data is filtered through XSS::filter
+   * Tests that data is filtered through XSS::filter.
    *
    * @covers ::filterData
    */
@@ -135,4 +136,5 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
       'Nordea alert(1)'
     );
   }
+
 }
