@@ -36,13 +36,15 @@ class HelsinkiProfiiliExceptionEventSubscriber implements EventSubscriberInterfa
           'target' => [
             'message' => $exception->getMessage(),
             'type' => get_class($exception),
-            'module' => 'helfi_helsinki_profiili'
-          ]
+            'module' => 'helfi_helsinki_profiili',
+          ],
         ];
 
         $auditlogService->dispatchEvent($message);
       }
-    } catch (\Exception $e) {
+    }
+    catch (\Exception $e) {
     }
   }
+
 }

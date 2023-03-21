@@ -15,7 +15,7 @@ class HelsinkiProfiiliExceptionEvent extends Event {
    * Construct a new event.
    *
    * @param \Exception $exception
-   *  The exception
+   *   The exception.
    */
   public function __construct(
     private \Exception $exception,

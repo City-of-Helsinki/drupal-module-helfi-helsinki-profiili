@@ -154,6 +154,8 @@ class HelsinkiProfiiliUserData {
    *   Where are we?
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
+   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $eventDispatcher
+   *   Dispatch events.
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
@@ -660,10 +662,7 @@ class HelsinkiProfiiliUserData {
    * Fill primaryPhone field from edge nodes, if it is missing.
    *
    * @param array $data
-   *   Data array
-   *
-   * @param string $field
-   *   Field to check (email | phone)
+   *   Data array.
    *
    * @return array
    *   Modified array
@@ -682,24 +681,23 @@ class HelsinkiProfiiliUserData {
       'address' => [
         'primary_field_key' => 'primaryAddress',
         'field_key' => 'addresses',
-      ]
+      ],
     ];
 
+    foreach ($fieldMapping as $mapping) {
 
-    foreach($fieldMapping as $mapping) {
-
-      list(
+      [
         'primary_field_key' => $primaryFieldKey,
         'field_key' => $fieldKey,
-      ) = $mapping;
+      ] = $mapping;
 
       $primaryField = $data['myProfile'][$primaryFieldKey];
       if ($primaryField === NULL) {
 
         /*
-        * Loop the edges. Get first node with verified flag, or
-        * the first edge if none is verified.
-        */
+         * Loop the edges. Get first node with verified flag, or
+         * the first edge if none is verified.
+         */
         foreach ($data['myProfile'][$fieldKey]['edges'] as $edge) {
           if ($edge['node']['primary']) {
             $primaryField = $edge['node'];
@@ -726,11 +724,12 @@ class HelsinkiProfiiliUserData {
 
   /**
    * Runs the array items through Xss::filter function.
+   *
    * @param array $data
-   * Input array.
+   *   Input array.
    *
    * @return array
-   * Filtered data.
+   *   Filtered data.
    */
   public function filterData(array $data) {
     // Make sure that data coming from HP is sanitized and does not contain
@@ -856,73 +855,76 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-  * {@inheritdoc}
-  */
- public function refreshTokens() {
+   * {@inheritdoc}
+   */
+  public function refreshTokens() {
 
-  $session = $this->requestStack->getCurrentRequest()->getSession();
-  $refresh_token = $session->get('openid_connect_refresh_token');
-  $plugin_id =  \Drupal::request()->getSession()->get('openid_connect_plugin_id');
+    $session = $this->requestStack->getCurrentRequest()->getSession();
+    $refresh_token = $session->get('openid_connect_refresh_token');
+    $plugin_id = \Drupal::request()->getSession()->get('openid_connect_plugin_id');
 
-  $storage = $this->entityManager->getStorage('openid_connect_client');
-  $entities  = $storage->loadByProperties(['plugin' => 'tunnistamo', 'id' => $plugin_id]);
+    $storage = $this->entityManager->getStorage('openid_connect_client');
+    $entities = $storage->loadByProperties([
+      'plugin' => 'tunnistamo',
+      'id' => $plugin_id,
+    ]);
 
-  if (!isset($entities[$plugin_id])) {
-    return FALSE;
-  }
+    if (!isset($entities[$plugin_id])) {
+      return FALSE;
+    }
 
-  $client = $entities[$plugin_id];
-  $configuration = $client->getPlugin()->getConfiguration();
+    $client = $entities[$plugin_id];
+    $configuration = $client->getPlugin()->getConfiguration();
 
-   // Exchange a refresh token for new tokens.
-   $endpoints = $this->getOpenIdConfiguration();
-   $request_options = [
-     'form_params' => [
-       'refresh_token' => $refresh_token,
-       'client_id' => $configuration['client_id'],
-       'client_secret' => $configuration['client_secret'],
-       'grant_type' => 'refresh_token',
-     ],
-     'headers' => [
-       'Accept' => 'application/json',
-     ],
-   ];
-
-   try {
-     $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
-     $response_data = json_decode((string) $response->getBody(), TRUE);
-     // Expected result.
-     $tokens = [
-       'id_token' => isset($response_data['id_token']) ? $response_data['id_token'] : NULL,
-       'access_token' => isset($response_data['access_token']) ? $response_data['access_token'] : NULL,
-     ];
-
-     $this->openidConnectSession->saveIdToken($tokens['id_token']);
-     $this->openidConnectSession->saveAccessToken($tokens['access_token']);
-
-     if (array_key_exists('expires_in', $response_data)) {
-       $tokens['expire'] = REQUEST_TIME + $response_data['expires_in'];
-       $session->set('openid_connect_expire', $tokens['expire']);
-     }
-     if (array_key_exists('refresh_token', $response_data)) {
-       $tokens['refresh_token'] = $response_data['refresh_token'];
-       $session->set('openid_connect_refresh_token', $response_data['refresh_token']);
-     }
-     return $tokens;
-   }
-   catch (\Exception $e) {
-    $this->dispatchExceptionEvent($e);
-    $variables = [
-      '@message' => 'Could not refresh tokens',
-      '@error_message' => $e->getMessage(),
+    // Exchange a refresh token for new tokens.
+    $endpoints = $this->getOpenIdConfiguration();
+    $request_options = [
+      'form_params' => [
+        'refresh_token' => $refresh_token,
+        'client_id' => $configuration['client_id'],
+        'client_secret' => $configuration['client_secret'],
+        'grant_type' => 'refresh_token',
+      ],
+      'headers' => [
+        'Accept' => 'application/json',
+      ],
     ];
-    $this->logger->error(
+
+    try {
+      $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
+      $response_data = json_decode((string) $response->getBody(), TRUE);
+      // Expected result.
+      $tokens = [
+        'id_token' => $response_data['id_token'] ?? NULL,
+        'access_token' => $response_data['access_token'] ?? NULL,
+      ];
+
+      $this->openidConnectSession->saveIdToken($tokens['id_token']);
+      $this->openidConnectSession->saveAccessToken($tokens['access_token']);
+
+      if (array_key_exists('expires_in', $response_data)) {
+        $tokens['expire'] = REQUEST_TIME + $response_data['expires_in'];
+        $session->set('openid_connect_expire', $tokens['expire']);
+      }
+      if (array_key_exists('refresh_token', $response_data)) {
+        $tokens['refresh_token'] = $response_data['refresh_token'];
+        $session->set('openid_connect_refresh_token', $response_data['refresh_token']);
+      }
+      return $tokens;
+    }
+    catch (\Exception $e) {
+      $this->dispatchExceptionEvent($e);
+      $variables = [
+        '@message' => 'Could not refresh tokens',
+        '@error_message' => $e->getMessage(),
+      ];
+      $this->logger->error(
       '@message: @error_message',
        $variables
-    );
-    return FALSE;
-   }
- }
+      );
+      return FALSE;
+    }
+  }
 
   /**
    * Verify JWT token.
@@ -1002,9 +1004,9 @@ class HelsinkiProfiiliUserData {
    * Dispatches exception event.
    *
    * @param \Exception $exception
-   *   The exception
+   *   The exception.
    */
-  private function dispatchExceptionEvent($exception) {
+  private function dispatchExceptionEvent(\Exception $exception): void {
     $event = new HelsinkiProfiiliExceptionEvent($exception);
     $this->eventDispatcher->dispatch(HelsinkiProfiiliExceptionEvent::EVENT_ID, $event);
   }
