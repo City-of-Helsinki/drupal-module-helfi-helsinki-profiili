@@ -803,6 +803,7 @@ class HelsinkiProfiiliUserData {
     $endpointMap = [
       'local' => self::TESTING_ENVIRONMENT,
       'dev' => self::TESTING_ENVIRONMENT,
+      'develop' => self::TESTING_ENVIRONMENT,
       'test' => self::TESTING_ENVIRONMENT,
       'testing' => self::TESTING_ENVIRONMENT,
       'stage' => self::STAGING_ENVIRONMENT,
