@@ -1,0 +1,9 @@
+msgid "User logged in to Helsinki services and data fetch failed."
+msgstr "Kirjautuminen Helsingin palveluihin onnistui ja tietojen päivitys epäonnistui."
+
+msgid "User logged in to Helsinki services, no profile data found."
+msgstr "Kirjautuminen Helsingin palveluihin onnistui ja profilitietoja ei löytynyt."
+
+msgid "User logged in to Helsinki services and data fetched."
+msgstr "Kirjautuminen Helsingin palveluihin onnistui ja tietojen nouto profiilista onnistui."
+

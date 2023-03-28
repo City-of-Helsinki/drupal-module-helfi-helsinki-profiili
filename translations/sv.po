@@ -1,0 +1,8 @@
+msgid "User logged in to Helsinki services and data fetch failed."
+msgstr "Inloggningen till Helsingfors tjänster lyckades och datauppdateringen misslyckades."
+
+msgid "User logged in to Helsinki services, no profile data found."
+msgstr "Användare inloggad på Helsingfors tjänster, inga profildata hittades."
+
+msgid "User logged in to Helsinki services and data fetched."
+msgstr "Användare inloggad på Helsingfors tjänster och data hämtas."
