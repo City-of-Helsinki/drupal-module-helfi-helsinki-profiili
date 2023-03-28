@@ -34,9 +34,10 @@ use Drupal\user\UserInterface;
  *   - plugin_id:      The plugin identifier.
  *   - sub:            The remote user identifier.
  *
+ * @throws \Drupal\Core\Entity\EntityStorageException
  * @ingroup openid_connect_api
  */
-function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context) {
+function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context): void {
 
   // Remove all existing roles.
   array_map(
@@ -93,8 +94,7 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
     }
 
     $account->save();
-  }
-  catch (EntityStorageException $e) {
+  } catch (EntityStorageException $e) {
   }
 
   if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
@@ -112,16 +112,20 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
             ->addWarning('User logged in, no profiledata found.');
         }
         else {
-          \Drupal::messenger()->addStatus('User logged in and data fetched');
+          \Drupal::messenger()->addStatus(t('User logged in and data fetched'));
         }
 
+      } catch (ProfileDataException $e) {
+        \Drupal::messenger()->addError(t('User profile data fetch failed'));
+        \Drupal::logger('helfi_helsinki_profiili')
+          ->error('User profile data fetch failed. Error: @error',
+            [
+              '@error' => $e->getMessage(),
+            ]
+          );
       }
-      catch (ProfileDataException $e) {
-        \Drupal::messenger()->addStatus($e->getMessage());
-      }
-    }
-    catch (GuzzleException $e) {
-      \Drupal::messenger()->addError('User profile data fetch failed');
+    } catch (GuzzleException $e) {
+      \Drupal::messenger()->addError(t('User profile data fetch failed'));
     }
   }
 
