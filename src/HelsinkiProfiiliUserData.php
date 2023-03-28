@@ -26,12 +26,6 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 class HelsinkiProfiiliUserData {
 
 
-  public const TESTING_ENVIRONMENT = 'https://tunnistamo.test.hel.ninja';
-
-  public const STAGING_ENVIRONMENT = 'https://api.hel.fi/sso-test';
-
-  public const PRODUCTION_ENVIRONMENT = 'https://api.hel.fi/sso';
-
   /**
    * The openid_connect.session service.
    *
@@ -800,41 +794,10 @@ class HelsinkiProfiiliUserData {
    * @throws \GuzzleHttp\Exception\GuzzleException
    */
   public function getOpenidConfigurationFromIssuer(): array {
-    $endpointMap = [
-      'local' => self::TESTING_ENVIRONMENT,
-      'dev' => self::TESTING_ENVIRONMENT,
-      'develop' => self::TESTING_ENVIRONMENT,
-      'development' => self::TESTING_ENVIRONMENT,
-      'test' => self::TESTING_ENVIRONMENT,
-      'testing' => self::TESTING_ENVIRONMENT,
-      'stage' => self::STAGING_ENVIRONMENT,
-      'staging' => self::STAGING_ENVIRONMENT,
-      'prod' => self::PRODUCTION_ENVIRONMENT,
-    ];
-    $base = self::STAGING_ENVIRONMENT;
-
-    $this->debugPrint('Endpoint maps: @maps', ['@maps' => Json::encode($endpointMap)]);
-
-    try {
-      // Attempt to automatically detect endpoint.
-      $env = $this->environmentResolver->getActiveEnvironmentName();
-
-      $this->debugPrint('Active environment: @maps', ['@maps' => $env]);
-
-      if (isset($endpointMap[$env])) {
-        $base = $endpointMap[$env];
-      }
-    }
-    catch (\InvalidArgumentException $e) {
-      $this->dispatchExceptionEvent($e);
-    }
-
-    $this->debugPrint('Enpoint selector: @maps', ['@maps' => $base]);
-
     return Json::decode(
       $this->httpClient->request(
         'GET',
-        sprintf('%s/openid/.well-known/openid-configuration/', $base)
+        sprintf('%s/openid/.well-known/openid-configuration/', getenv('TUNNISTAMO_ENVIRONMENT_URL'))
       )->getBody()
     );
   }
