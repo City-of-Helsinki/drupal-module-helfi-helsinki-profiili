@@ -109,14 +109,14 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
 
         if ($data == NULL) {
           \Drupal::messenger()
-            ->addWarning('User logged in, no profiledata found.');
+            ->addWarning('User logged in to Helsinki services, no profiledata found.');
         }
         else {
-          \Drupal::messenger()->addStatus(t('User logged in and data fetched'));
+          \Drupal::messenger()->addStatus(t('User logged in to Helsinki services and data fetched.'));
         }
 
       } catch (ProfileDataException $e) {
-        \Drupal::messenger()->addError(t('User profile data fetch failed'));
+        \Drupal::messenger()->addError(t('User logged in to Helsinki services and data fetch failed'));
         \Drupal::logger('helfi_helsinki_profiili')
           ->error('User profile data fetch failed. Error: @error',
             [
@@ -125,7 +125,7 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
           );
       }
     } catch (GuzzleException $e) {
-      \Drupal::messenger()->addError(t('User profile data fetch failed'));
+      \Drupal::messenger()->addError(t('User logged in to Helsinki services and data fetch failed'));
     }
   }
 
