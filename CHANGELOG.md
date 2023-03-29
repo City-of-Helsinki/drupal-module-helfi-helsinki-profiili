@@ -1,6 +1,11 @@
 # Chanelog
 
 ## 0.9.13
+- 25b1a8b fix: AU-827: add translations to info (#14)
+- 63686a1 hotfix: AU-XX-use-env-variables
+- 801d320 fix: Use configurable environment url.
+
+## 0.9.13
 - e8325df fix: AU-827: User login message (#12)
 - 9bc4fc0 Add develop environment support to profile
 
