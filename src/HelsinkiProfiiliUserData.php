@@ -751,6 +751,16 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
+   * Get roles of the current user.
+   *
+   * @return array
+   *   Roles.
+   */
+  public function getCurrentUserRoles(): array {
+    return $this->currentUser->getRoles();
+  }
+
+  /**
    * Get user roles that have helsinki profile authentication.
    *
    * @return array
