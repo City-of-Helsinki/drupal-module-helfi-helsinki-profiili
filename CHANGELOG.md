@@ -1,5 +1,11 @@
 # Chanelog
 
+## 0.9.16
+- c454353 feat: AU-1407 testing improvements (#16)
+
+## 0.9.16
+- 25b1a8b fix: AU-827: add translations to info (#14)
+
 ## 0.9.13
 - 25b1a8b fix: AU-827: add translations to info (#14)
 - 63686a1 hotfix: AU-XX-use-env-variables
