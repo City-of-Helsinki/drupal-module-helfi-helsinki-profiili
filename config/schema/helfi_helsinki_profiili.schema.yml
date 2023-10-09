@@ -20,4 +20,6 @@ helfi_helsinki_profiili.settings:
     clients:
       type: sequence
       label: 'Client ids used with helsinki profile.'
-
+    email_role_mappings:
+      type: sequence
+      label: 'Email based roles'

@@ -51,6 +51,12 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
   $config = \Drupal::config('helfi_helsinki_profiili.settings');
   $rolesConfig = $config->get('roles');
   $clientsConfig = $config->get('clients');
+  $emailRoleConfig = $config->get('email_role_mappings');
+
+  $emailRoleMappings = [];
+  foreach ($emailRoleConfig as $emailRolemap) {
+    $emailRoleMappings[$emailRolemap['user']] = $emailRolemap['roles'];
+  }
 
   $session = \Drupal::request()->getSession();
   $session->set('openid_connect_plugin_id', $context["plugin_id"]);
@@ -90,6 +96,14 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
           },
           $context["user_data"]["ad_groups"]
         );
+      }
+
+      // Add roles based on the email.
+      if ($context['user_data']['email'] && $emailRoleMappings[$context['user_data']['email']]) {
+        $customRoles = $emailRoleMappings[$context['user_data']['email']];
+        foreach ($customRoles as $customRole) {
+          $account->addRole($customRole);
+        }
       }
     }
 

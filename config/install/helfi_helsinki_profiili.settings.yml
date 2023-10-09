@@ -9,4 +9,4 @@ roles:
 clients:
   hp_user_client: 'tunnistamo'
   hp_admin_client: 'tunnistamoadmin'
-
+email_role_mappings:
