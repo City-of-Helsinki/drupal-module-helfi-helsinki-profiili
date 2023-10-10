@@ -1,5 +1,9 @@
 # Chanelog
 
+## 0.9.18
+- 75c785c feat: AU-1713: Add possibility to map custom roles based email (#17)
+- c454353 feat: AU-1407 testing improvements (#16)
+
 ## 0.9.16
 - c454353 feat: AU-1407 testing improvements (#16)
 
