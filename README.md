@@ -6,7 +6,7 @@ Userdata is queried from graphql endpoint in Tunnistamo. Userdata is saved for r
 
 ## Configuration
 
-´´´
+```
   - roles:
   hp_user_roles:
     - 'helsinkiprofiili'
@@ -17,7 +17,7 @@ Userdata is queried from graphql endpoint in Tunnistamo. Userdata is saved for r
     hp_user_client: 'tunnistamo'
     hp_admin_client: 'tunnistamoadmin'
 
-´´´
+```
 
 ## Environment
 
