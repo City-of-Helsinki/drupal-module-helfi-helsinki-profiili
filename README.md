@@ -23,5 +23,6 @@ Userdata is queried from graphql endpoint in Tunnistamo. Userdata is saved for r
 
 USERINFO_ENDPOINT -> endpoint uri to /userinfo graphql endpoint
 
+
 TUNNISTAMO_API_TOKEN_ENDPOINT -> endpoint uri to /api-tokens endpoint
 
