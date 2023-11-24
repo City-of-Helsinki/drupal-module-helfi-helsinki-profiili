@@ -1,0 +1,9 @@
+name: helfi_helsinki_profiili_audit_logging
+type: module
+description: Adds audit log features to ATV module
+package: Hel.fi
+core: 8.x
+core_version_requirement: ^8 || ^9
+dependencies:
+  - helfi_audit_log
+  - helfi_helsinki_profiili

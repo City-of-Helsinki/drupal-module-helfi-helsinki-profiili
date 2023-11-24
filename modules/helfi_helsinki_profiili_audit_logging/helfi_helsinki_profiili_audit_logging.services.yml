@@ -1,0 +1,7 @@
+services:
+  helfi_helsinki_profiili_audit_logging.exception_event_subscriber:
+    class: 'Drupal\helfi_helsinki_profiili_audit_logging\EventSubscriber\HelsinkiProfiiliExceptionEventSubscriber'
+    tags:
+      - { name: event_subscriber }
+    arguments:
+      - '@helfi_audit_log.audit_log'

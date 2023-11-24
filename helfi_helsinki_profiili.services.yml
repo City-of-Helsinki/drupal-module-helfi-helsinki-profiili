@@ -23,7 +23,3 @@ services:
     arguments: ['@messenger']
     tags:
       - { name: event_subscriber }
-  helfi_helsinki_profiili.exception_event_subscriber:
-    class: Drupal\helfi_helsinki_profiili\EventSubscriber\HelsinkiProfiiliExceptionEventSubscriber
-    tags:
-      - { name: event_subscriber }
