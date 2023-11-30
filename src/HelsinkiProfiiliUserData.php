@@ -11,6 +11,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
+use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliOperationEvent;
 use Drupal\openid_connect\OpenIDConnectSession;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
@@ -350,6 +351,7 @@ class HelsinkiProfiiliUserData {
           'variables' => $variables,
         ],
       ]);
+      $this->dispatchOperationEvent('PROFILE DATA FETCH');
 
       $json = $response->getBody()->getContents();
       $body = Json::decode($json);
@@ -867,6 +869,7 @@ class HelsinkiProfiiliUserData {
 
     try {
       $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
+      $this->dispatchOperationEvent('TOKEN FETCH');
       $response_data = json_decode((string) $response->getBody(), TRUE);
       // Expected result.
       $tokens = [
@@ -984,6 +987,17 @@ class HelsinkiProfiiliUserData {
   private function dispatchExceptionEvent(\Exception $exception): void {
     $event = new HelsinkiProfiiliExceptionEvent($exception);
     $this->eventDispatcher->dispatch(HelsinkiProfiiliExceptionEvent::EVENT_ID, $event);
+  }
+
+  /**
+   * Dispatches operation event.
+   *
+   * @param string $message
+   *   The message.
+   */
+  private function dispatchOperationEvent(string $message): void {
+    $event = new HelsinkiProfiiliOperationEvent($message);
+    $this->eventDispatcher->dispatch(HelsinkiProfiiliOperationEvent::EVENT_ID, $event);
   }
 
 }
