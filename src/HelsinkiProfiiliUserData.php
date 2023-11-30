@@ -30,21 +30,21 @@ class HelsinkiProfiiliUserData {
   /**
    * The openid_connect.session service.
    *
-   * @var OpenIDConnectSession
+   * @var \Drupal\openid_connect\OpenIDConnectSession
    */
   protected OpenIDConnectSession $openidConnectSession;
 
   /**
    * The HTTP client.
    *
-   * @var ClientInterface
+   * @var \GuzzleHttp\ClientInterface
    */
   protected ClientInterface $httpClient;
 
   /**
    * The logger channel factory.
    *
-   * @var LoggerChannelFactoryInterface
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
    */
   protected $logger;
 
@@ -58,14 +58,14 @@ class HelsinkiProfiiliUserData {
   /**
    * Drupal\Core\Session\AccountProxyInterface definition.
    *
-   * @var AccountProxyInterface
+   * @var \Drupal\Core\Session\AccountProxyInterface
    */
   protected AccountProxyInterface $currentUser;
 
   /**
    * Request stack for session access.
    *
-   * @var RequestStack
+   * @var \Drupal\Core\Http\RequestStack
    */
   protected RequestStack $requestStack;
 
@@ -86,14 +86,14 @@ class HelsinkiProfiiliUserData {
   /**
    * The environment resolver.
    *
-   * @var EnvironmentResolverInterface
+   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
    */
   private EnvironmentResolverInterface $environmentResolver;
 
   /**
    * The entity type manager.
    *
-   * @var EnvironmentResolverInterface
+   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
    */
   private EntityTypeManagerInterface $entityManager;
 
@@ -128,28 +128,28 @@ class HelsinkiProfiiliUserData {
   /**
    * The event dispatcher service.
    *
-   * @var EventDispatcherInterface
+   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
    */
   protected EventDispatcherInterface $eventDispatcher;
 
   /**
    * Constructs a HelsinkiProfiiliUser object.
    *
-   * @param OpenIDConnectSession $openid_connect_session
+   * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
    *   The openid_connect.session service.
-   * @param ClientInterface $http_client
+   * @param \GuzzleHttp\ClientInterface $http_client
    *   The HTTP client.
-   * @param LoggerChannelFactoryInterface $logger_factory
+   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    *   The logger channel factory.
-   * @param AccountProxyInterface $currentUser
+   * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
    *   Current user session.
-   * @param RequestStack $requestStack
+   * @param \Drupal\Core\Http\RequestStack $requestStack
    *   Access session store.
-   * @param EnvironmentResolverInterface $environmentResolver
+   * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
    *   Where are we?
-   * @param EntityTypeManagerInterface $entityTypeManager
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
-   * @param EventDispatcherInterface $eventDispatcher
+   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $eventDispatcher
    *   Dispatch events.
    */
   public function __construct(
@@ -745,7 +745,7 @@ class HelsinkiProfiiliUserData {
   /**
    * Get current user data.
    *
-   * @return AccountProxyInterface
+   * @return \Drupal\Core\Session\AccountProxyInterface
    *   Current user.
    */
   public function getCurrentUser(): AccountProxyInterface {
@@ -990,7 +990,7 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-   * Dispatches operation event.
+   * Dispatches exception event.
    *
    * @param string $message
    *   The message.
