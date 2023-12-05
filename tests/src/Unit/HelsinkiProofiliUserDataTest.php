@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\helfi_helsinki_profiili\Unit;
 
+use Drupal\Component\EventDispatcher\ContainerAwareEventDispatcher;
 use Drupal\Component\Serialization\Json;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -46,6 +49,8 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
     $container->set('current_user', $this->prophesize(AccountProxyInterface::class)->reveal());
     $container->set('request_stack', $this->prophesize(RequestStack::class)->reveal());
     $container->set('helfi_api_base.environment_resolver', $this->prophesize(EnvironmentResolverInterface::class)->reveal());
+    $container->set('entity_type.manager', $this->prophesize(EntityTypeManagerInterface::class)->reveal());
+    $container->set('event_dispatcher', $this->prophesize(ContainerAwareEventDispatcher::class)->reveal());
 
     $configFactory = $this->getConfigFactoryStub([
       'helfi_helsinki_profiili.settings' => ['roles' => []],
@@ -60,6 +65,8 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
       $this->prophesize(AccountProxyInterface::class)->reveal(),
       $this->prophesize(RequestStack::class)->reveal(),
       $this->prophesize(EnvironmentResolverInterface::class)->reveal(),
+      $this->prophesize(EntityTypeManagerInterface::class)->reveal(),
+      $this->prophesize(ContainerAwareEventDispatcher::class)->reveal()
     );
 
     $this->service = $service;
