@@ -6,15 +6,15 @@ namespace Drupal\Tests\helfi_helsinki_profiili\Unit;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
+use Drupal\Core\Http\RequestStack;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData;
 use Drupal\openid_connect\OpenIDConnectSession;
 use Drupal\Tests\UnitTestCase;
-use Prophecy\PhpUnit\ProphecyTrait;
 use GuzzleHttp\ClientInterface;
-use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Drupal\Core\Http\RequestStack;
-use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
+use Prophecy\PhpUnit\ProphecyTrait;
 
 /**
  * Tests HelsinkiProfiiliUserData class.

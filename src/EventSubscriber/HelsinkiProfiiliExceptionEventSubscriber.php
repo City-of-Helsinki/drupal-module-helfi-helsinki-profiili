@@ -2,8 +2,8 @@
 
 namespace Drupal\helfi_helsinki_profiili\EventSubscriber;
 
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
  * Monitors submission view events and logs them to audit log.
@@ -25,7 +25,7 @@ class HelsinkiProfiiliExceptionEventSubscriber implements EventSubscriberInterfa
    *   An exception event.
    */
   public function onException(HelsinkiProfiiliExceptionEvent $event) {
-
+    // phpcs:disable
     try {
       // Try to get service, this will throw exception if not found.
       $auditlogService = \Drupal::service('helfi_audit_log.audit_log');
@@ -45,6 +45,7 @@ class HelsinkiProfiiliExceptionEventSubscriber implements EventSubscriberInterfa
     }
     catch (\Exception $e) {
     }
+    // phpcs:enable
   }
 
 }
