@@ -6,20 +6,23 @@ Userdata is queried from graphql endpoint in Tunnistamo. Userdata is saved for r
 
 ## Configuration
 
-`
-roles:
-hp_user_roles:
-- 'helsinkiprofiili'
-hp_user_role_strong: 'helsinkiprofiili'
-hp_user_role_weak: ''
-admin_user_roles: []
-clients:
-hp_user_client: 'tunnistamo'
-hp_admin_client: 'tunnistamoadmin'
-`
+```
+  - roles:
+  hp_user_roles:
+    - 'helsinkiprofiili'
+  hp_user_role_strong: 'helsinkiprofiili'
+  hp_user_role_weak: ''
+  admin_user_roles: []
+  - clients:
+    hp_user_client: 'tunnistamo'
+    hp_admin_client: 'tunnistamoadmin'
+
+```
 
 ## Environment
 
 USERINFO_ENDPOINT -> endpoint uri to /userinfo graphql endpoint
+
+
 TUNNISTAMO_API_TOKEN_ENDPOINT -> endpoint uri to /api-tokens endpoint
 

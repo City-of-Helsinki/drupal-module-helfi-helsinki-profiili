@@ -9,11 +9,11 @@
  * @see https://www.drupal.org/node/2217931
  */
 
-use Drupal\Core\Session\AccountProxyInterface;
-use GuzzleHttp\Exception\GuzzleException;
 use Drupal\Core\Entity\EntityStorageException;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\helfi_helsinki_profiili\ProfileDataException;
 use Drupal\user\UserInterface;
+use GuzzleHttp\Exception\GuzzleException;
 
 /**
  * OpenID Connect post authorize hook.
@@ -35,6 +35,7 @@ use Drupal\user\UserInterface;
  *   - sub:            The remote user identifier.
  *
  * @throws \Drupal\Core\Entity\EntityStorageException
+ *
  * @ingroup openid_connect_api
  */
 function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context): void {
@@ -108,7 +109,8 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
     }
 
     $account->save();
-  } catch (EntityStorageException $e) {
+  }
+  catch (EntityStorageException $e) {
   }
 
   if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
@@ -129,16 +131,18 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
           \Drupal::messenger()->addStatus(t('User logged in to Helsinki services and data fetched.'));
         }
 
-      } catch (ProfileDataException $e) {
+      }
+      catch (ProfileDataException $e) {
         \Drupal::messenger()->addError(t('User logged in to Helsinki services and data fetch failed'));
         \Drupal::logger('helfi_helsinki_profiili')
           ->error('User profile data fetch failed. Error: @error',
             [
               '@error' => $e->getMessage(),
             ]
-          );
+                );
       }
-    } catch (GuzzleException $e) {
+    }
+    catch (GuzzleException $e) {
       \Drupal::messenger()->addError(t('User logged in to Helsinki services and data fetch failed'));
     }
   }
