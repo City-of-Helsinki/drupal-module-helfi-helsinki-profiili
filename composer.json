@@ -19,6 +19,21 @@
         }
     },
     "require": {
-        "firebase/php-jwt": "^6.3"
-    }
+        "firebase/php-jwt": "^6.3",
+        "drupal/helfi_tunnistamo": "^2.0"
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://repository.drupal.hel.ninja"
+        },
+        {
+            "type": "composer",
+            "url": "https://packages.drupal.org/8"
+        },
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ]
 }
