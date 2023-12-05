@@ -66,7 +66,8 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
       $this->prophesize(RequestStack::class)->reveal(),
       $this->prophesize(EnvironmentResolverInterface::class)->reveal(),
       $this->prophesize(EntityTypeManagerInterface::class)->reveal(),
-      $this->prophesize(ContainerAwareEventDispatcher::class)->reveal()
+      $this->prophesize(ContainerAwareEventDispatcher::class)->reveal(),
+      $this->prophesize(ConfigFactoryInterface::class)->reveal()
     );
 
     $this->service = $service;
