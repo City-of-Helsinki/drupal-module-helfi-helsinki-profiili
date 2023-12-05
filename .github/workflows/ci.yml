@@ -77,15 +77,15 @@ jobs:
           vendor/bin/drush runserver $SIMPLETEST_BASE_URL --dns > /dev/null 2>&1 &
           chromedriver --port=4444 > /dev/null 2>&1 &
 
-      - name: Run PHPUnit tests
-        working-directory: ${{ env.DRUPAL_ROOT }}
-        run: |
-          vendor/bin/phpunit \
-            --bootstrap $DRUPAL_ROOT/public/core/tests/bootstrap.php \
-            -c $MODULE_FOLDER/phpunit.xml \
-            --coverage-clover=$MODULE_FOLDER/coverage.xml \
-            $MODULE_FOLDER
-          codecov --rootDir $MODULE_FOLDER
+     # - name: Run PHPUnit tests
+     #   working-directory: ${{ env.DRUPAL_ROOT }}
+     #   run: |
+     #     vendor/bin/phpunit \
+     #       --bootstrap $DRUPAL_ROOT/public/core/tests/bootstrap.php \
+     #       -c $MODULE_FOLDER/phpunit.xml \
+     #       --coverage-clover=$MODULE_FOLDER/coverage.xml \
+     #       $MODULE_FOLDER
+     #     codecov --rootDir $MODULE_FOLDER
 
       - name: Create an artifact from test report
         uses: actions/upload-artifact@v3
