@@ -19,6 +19,7 @@
         }
     },
     "require": {
-        "firebase/php-jwt": "^6.3"
+        "firebase/php-jwt": "^6.3",
+        "drupal/helfi_tunnistamo": "^2.0"
     }
 }

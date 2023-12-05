@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\tests\helfi_helsinki_profiili\Unit;
+namespace Drupal\Tests\helfi_helsinki_profiili\Unit;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
