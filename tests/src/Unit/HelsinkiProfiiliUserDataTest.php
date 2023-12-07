@@ -66,8 +66,6 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
 
   /**
    * Tests that function return first primary node.
-   *
-   * @covers ::checkPrimaryFields
    */
   public function testGetsFirstPrimaryNode() {
     $json = $this->getFixture('multiple_primaries.json');
@@ -82,8 +80,6 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
    * Tests that function returns first node.
    *
    * Incase no primary nodes are available.
-   *
-   * @covers ::checkPrimaryFields
    */
   public function testGetsFirstNodeWhenNoPrimary() {
     $json = $this->getFixture('profile_data.json');
@@ -97,8 +93,6 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
    * Tests that function doesn't change primaryFields.
    *
    * If there is non-null value already.
-   *
-   * @covers ::checkPrimaryFields
    */
   public function testDoesntChangeValidPrimaryData() {
     $json = $this->getFixture('profile_data_valid_primary.json');
@@ -111,8 +105,6 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
 
   /**
    * Tests that data is filtered through XSS::filter.
-   *
-   * @covers ::filterData
    */
   public function testXssFiltering() {
     $json = $this->getFixture('xss.json');
