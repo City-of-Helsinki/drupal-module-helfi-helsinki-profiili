@@ -14,8 +14,8 @@ class HelsinkiProfiiliOperationEvent extends Event {
   /**
    * Construct a new event.
    *
-   * @param \Exception $exception
-   *   The exception.
+   * @param string $name
+   *   Name of operation.
    */
   public function __construct(
     private string $name,
@@ -25,7 +25,7 @@ class HelsinkiProfiiliOperationEvent extends Event {
    * Get the name.
    *
    * @return string
-   *   Name of the event.
+   *   Name of the operation.
    */
   public function getName() {
     return $this->name;

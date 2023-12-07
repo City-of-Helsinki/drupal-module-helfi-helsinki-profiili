@@ -4,10 +4,8 @@ namespace Drupal\helfi_helsinki_profiili;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Xss;
-use Drupal\Core\Config\Config;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
@@ -22,6 +20,7 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
@@ -134,13 +133,6 @@ class HelsinkiProfiiliUserData {
   protected EventDispatcherInterface $eventDispatcher;
 
   /**
-   * The event dispatcher service.
-   *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
-   */
-  protected Config $config;
-
-  /**
    * Constructs a HelsinkiProfiiliUser object.
    *
    * @param \Drupal\openid_connect\OpenIDConnectSession $openid_connect_session
@@ -151,7 +143,7 @@ class HelsinkiProfiiliUserData {
    *   The logger channel factory.
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
    *   Current user session.
-   * @param \Drupal\Core\Http\RequestStack $requestStack
+   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
    *   Access session store.
    * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
    *   Where are we?
@@ -160,7 +152,7 @@ class HelsinkiProfiiliUserData {
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $eventDispatcher
    *   Dispatch events.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
-   *   Dispatch events.
+   *   Config factory.
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
@@ -185,8 +177,8 @@ class HelsinkiProfiiliUserData {
 
     $this->openIdConfiguration = [];
 
-    $this->config = $configFactory->get('helfi_helsinki_profiili.settings');
-    $rolesConfig = $this->config->get('roles');
+    $config = $configFactory->get('helfi_helsinki_profiili.settings');
+    $rolesConfig = $config->get('roles');
 
     if (!empty($rolesConfig['hp_user_roles'])) {
       $this->hpUserRoles = $rolesConfig['hp_user_roles'];
@@ -831,9 +823,7 @@ class HelsinkiProfiiliUserData {
   public function refreshTokens() {
     $session = $this->requestStack->getCurrentRequest()->getSession();
     $refresh_token = $session->get('openid_connect_refresh_token');
-    $plugin_id = $this->requestStack->getCurrentRequest()
-      ->getSession()
-      ->get('openid_connect_plugin_id');
+    $plugin_id = $session->get('openid_connect_plugin_id');
 
     $storage = $this->entityManager->getStorage('openid_connect_client');
     $entities = $storage->loadByProperties([
