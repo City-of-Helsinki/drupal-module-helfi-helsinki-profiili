@@ -833,6 +833,7 @@ class HelsinkiProfiiliUserData {
   public function refreshTokens() {
     $session = $this->requestStack->getCurrentRequest()->getSession();
     $refresh_token = $session->get('openid_connect_refresh_token');
+    
     $plugin_id = $this->requestStack->getCurrentRequest()
       ->getSession()
       ->get('openid_connect_plugin_id');

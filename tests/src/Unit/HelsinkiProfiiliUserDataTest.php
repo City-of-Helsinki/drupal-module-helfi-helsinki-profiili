@@ -32,18 +32,7 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
   /**
    * Helper method to return fresh instance of HelsinkiProfiiliUserData.
    */
-  public function setUp():void {
-    $container = new ContainerBuilder();
-    \Drupal::setContainer($container);
-
-    $container->set('openid_connect.session', $this->prophesize(OpenIDConnectSession::class)->reveal());
-    $container->set('http_client', $this->prophesize(ClientInterface::class)->reveal());
-    $container->set('logger.factory', $this->prophesize(LoggerChannelFactoryInterface::class)->reveal());
-    $container->set('current_user', $this->prophesize(AccountProxyInterface::class)->reveal());
-    $container->set('request_stack', $this->prophesize(RequestStack::class)->reveal());
-    $container->set('helfi_api_base.environment_resolver', $this->prophesize(EnvironmentResolverInterface::class)->reveal());
-    $container->set('entity_type.manager', $this->prophesize(EntityTypeManagerInterface::class)->reveal());
-    $container->set('event_dispatcher', $this->prophesize(ContainerAwareEventDispatcher::class)->reveal());
+  public function getService(): HelsinkiProfiiliUserData {
 
     $configFactory = $this->getConfigFactoryStub([
       'helfi_helsinki_profiili.settings' => ['roles' => []],
@@ -58,7 +47,7 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
       $this->prophesize(EnvironmentResolverInterface::class)->reveal(),
       $this->prophesize(EntityTypeManagerInterface::class)->reveal(),
       $this->prophesize(ContainerAwareEventDispatcher::class)->reveal(),
-      $this->prophesize(ConfigFactoryInterface::class)->reveal()
+      $configFactory,
     );
     return $service;
   }
