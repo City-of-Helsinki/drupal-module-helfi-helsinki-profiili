@@ -9,21 +9,18 @@ services:
       '@request_stack',
       '@helfi_api_base.environment_resolver',
       '@entity_type.manager',
-      '@event_dispatcher'
+      '@event_dispatcher',
+      '@config.factory'
     ]
 
   helfi_helsinki_profiili.middleware:
     class: Drupal\helfi_helsinki_profiili\RegisterPageRedirectMiddleware
-    arguments: ['@messenger']
+    arguments: ['@messenger', '@language_manager']
     tags:
       - { name: http_middleware, priority: 1000 }
 
   helfi_helsinki_profiili.token_event_subscriber:
     class: Drupal\helfi_helsinki_profiili\EventSubscriber\TokenExpiredExceptionSubscriber
     arguments: ['@messenger']
-    tags:
-      - { name: event_subscriber }
-  helfi_helsinki_profiili.exception_event_subscriber:
-    class: Drupal\helfi_helsinki_profiili\EventSubscriber\HelsinkiProfiiliExceptionEventSubscriber
     tags:
       - { name: event_subscriber }
