@@ -4,15 +4,18 @@ namespace Drupal\helfi_helsinki_profiili;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Xss;
+<<<<<<< HEAD
 use Drupal\Core\Config\Config;
+=======
+>>>>>>> d2418fccb4f504fbee084f859071dea38634ead9
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
+use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliOperationEvent;
 use Drupal\openid_connect\OpenIDConnectSession;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
@@ -21,6 +24,7 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
@@ -150,16 +154,25 @@ class HelsinkiProfiiliUserData {
    *   The logger channel factory.
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
    *   Current user session.
+<<<<<<< HEAD
    * @param \Drupal\Core\Http\RequestStack $requestStack
+=======
+   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
+>>>>>>> d2418fccb4f504fbee084f859071dea38634ead9
    *   Access session store.
    * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
    *   Where are we?
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $eventDispatcher
+<<<<<<< HEAD
    *   Dispatch events.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+=======
+>>>>>>> d2418fccb4f504fbee084f859071dea38634ead9
    *   Dispatch events.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   Config factory.
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
@@ -184,8 +197,13 @@ class HelsinkiProfiiliUserData {
 
     $this->openIdConfiguration = [];
 
+<<<<<<< HEAD
     $this->config = $configFactory->get('helfi_helsinki_profiili.settings');
     $rolesConfig = $this->config->get('roles');
+=======
+    $config = $configFactory->get('helfi_helsinki_profiili.settings');
+    $rolesConfig = $config->get('roles');
+>>>>>>> d2418fccb4f504fbee084f859071dea38634ead9
 
     if (!empty($rolesConfig['hp_user_roles'])) {
       $this->hpUserRoles = $rolesConfig['hp_user_roles'];
@@ -356,6 +374,7 @@ class HelsinkiProfiiliUserData {
           'variables' => $variables,
         ],
       ]);
+      $this->dispatchOperationEvent('PROFILE DATA FETCH');
 
       $json = $response->getBody()->getContents();
       $body = Json::decode($json);
@@ -829,9 +848,13 @@ class HelsinkiProfiiliUserData {
   public function refreshTokens() {
     $session = $this->requestStack->getCurrentRequest()->getSession();
     $refresh_token = $session->get('openid_connect_refresh_token');
+<<<<<<< HEAD
     $plugin_id = $this->requestStack->getCurrentRequest()
       ->getSession()
       ->get('openid_connect_plugin_id');
+=======
+    $plugin_id = $session->get('openid_connect_plugin_id');
+>>>>>>> d2418fccb4f504fbee084f859071dea38634ead9
 
     $storage = $this->entityManager->getStorage('openid_connect_client');
     $entities = $storage->loadByProperties([
@@ -862,6 +885,7 @@ class HelsinkiProfiiliUserData {
 
     try {
       $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
+      $this->dispatchOperationEvent('TOKEN FETCH');
       $response_data = json_decode((string) $response->getBody(), TRUE);
       // Expected result.
       $tokens = [
@@ -978,6 +1002,17 @@ class HelsinkiProfiiliUserData {
   private function dispatchExceptionEvent(\Exception $exception): void {
     $event = new HelsinkiProfiiliExceptionEvent($exception);
     $this->eventDispatcher->dispatch(HelsinkiProfiiliExceptionEvent::EVENT_ID, $event);
+  }
+
+  /**
+   * Dispatches exception event.
+   *
+   * @param string $message
+   *   The message.
+   */
+  private function dispatchOperationEvent(string $message): void {
+    $event = new HelsinkiProfiiliOperationEvent($message);
+    $this->eventDispatcher->dispatch(HelsinkiProfiiliOperationEvent::EVENT_ID, $event);
   }
 
 }
