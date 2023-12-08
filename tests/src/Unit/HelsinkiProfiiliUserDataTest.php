@@ -25,19 +25,12 @@ use Prophecy\PhpUnit\ProphecyTrait;
  * @coversDefaultClass \Drupal\helfi_helsinki_profiile\HelsinkiProfiiliUserData
  * @group helfi_helsinki_profiili
  */
-class HelsinkiProofiliUserDataTest extends UnitTestCase {
+class HelsinkiProfiiliUserDataTest extends UnitTestCase {
 
   use ProphecyTrait;
 
   /**
-   * Service instance.
-   *
-   * @var \Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData
-   */
-  protected $service;
-
-  /**
-   * {@inheritdoc}
+   * Helper method to return fresh instance of HelsinkiProfiiliUserData.
    */
   public function setUp():void {
     $container = new ContainerBuilder();
@@ -56,8 +49,6 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
       'helfi_helsinki_profiili.settings' => ['roles' => []],
     ]);
 
-    $container->set('config.factory', $configFactory);
-
     $service = new HelsinkiProfiiliUserData(
       $this->prophesize(OpenIDConnectSession::class)->reveal(),
       $this->prophesize(ClientInterface::class)->reveal(),
@@ -69,8 +60,7 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
       $this->prophesize(ContainerAwareEventDispatcher::class)->reveal(),
       $this->prophesize(ConfigFactoryInterface::class)->reveal()
     );
-
-    $this->service = $service;
+    return $service;
   }
 
   /**
@@ -90,12 +80,11 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
 
   /**
    * Tests that function return first primary node.
-   *
-   * @covers ::checkPrimaryFields
    */
   public function testGetsFirstPrimaryNode() {
     $json = $this->getFixture('multiple_primaries.json');
-    $data = $this->service->checkPrimaryFields($json);
+    $service = $this->getService();
+    $data = $service->checkPrimaryFields($json);
 
     $this->assertEquals($data['myProfile']['primaryEmail']['email'], 'primary@test.test');
     $this->assertEquals($data['myProfile']['primaryPhone']['phone'], '+358111111111');
@@ -105,12 +94,11 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
    * Tests that function returns first node.
    *
    * Incase no primary nodes are available.
-   *
-   * @covers ::checkPrimaryFields
    */
   public function testGetsFirstNodeWhenNoPrimary() {
     $json = $this->getFixture('profile_data.json');
-    $data = $this->service->checkPrimaryFields($json);
+    $service = $this->getService();
+    $data = $service->checkPrimaryFields($json);
 
     $this->assertEquals($data['myProfile']['primaryEmail']['email'], 'primary@test.test');
   }
@@ -119,12 +107,11 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
    * Tests that function doesn't change primaryFields.
    *
    * If there is non-null value already.
-   *
-   * @covers ::checkPrimaryFields
    */
   public function testDoesntChangeValidPrimaryData() {
     $json = $this->getFixture('profile_data_valid_primary.json');
-    $data = $this->service->checkPrimaryFields($json);
+    $service = $this->getService();
+    $data = $service->checkPrimaryFields($json);
 
     $this->assertEquals($data['myProfile']['primaryEmail']['email'], 'primary@test.test');
     $this->assertEquals($data['myProfile']['primaryPhone']['phone'], '+358000000000');
@@ -132,12 +119,11 @@ class HelsinkiProofiliUserDataTest extends UnitTestCase {
 
   /**
    * Tests that data is filtered through XSS::filter.
-   *
-   * @covers ::filterData
    */
   public function testXssFiltering() {
     $json = $this->getFixture('xss.json');
-    $filteredData = $this->service->filterData($json);
+    $service = $this->getService();
+    $filteredData = $service->filterData($json);
 
     $this->assertEquals(
       $filteredData['myProfile']['verifiedPersonalInformation']['firstName'],

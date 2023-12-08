@@ -7,12 +7,12 @@ use Drupal\Component\Utility\Xss;
 use Drupal\Core\Config\Config;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
+use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliOperationEvent;
 use Drupal\openid_connect\OpenIDConnectSession;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
@@ -21,6 +21,7 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Integrate HelsinkiProfiili data to Drupal User.
@@ -160,6 +161,8 @@ class HelsinkiProfiiliUserData {
    *   Dispatch events.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   Dispatch events.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   Config factory.
    */
   public function __construct(
     OpenIDConnectSession $openid_connect_session,
@@ -356,6 +359,7 @@ class HelsinkiProfiiliUserData {
           'variables' => $variables,
         ],
       ]);
+      $this->dispatchOperationEvent('PROFILE DATA FETCH');
 
       $json = $response->getBody()->getContents();
       $body = Json::decode($json);
@@ -862,6 +866,7 @@ class HelsinkiProfiiliUserData {
 
     try {
       $response = $this->httpClient->request('POST', $endpoints['token_endpoint'], $request_options);
+      $this->dispatchOperationEvent('TOKEN FETCH');
       $response_data = json_decode((string) $response->getBody(), TRUE);
       // Expected result.
       $tokens = [
@@ -978,6 +983,17 @@ class HelsinkiProfiiliUserData {
   private function dispatchExceptionEvent(\Exception $exception): void {
     $event = new HelsinkiProfiiliExceptionEvent($exception);
     $this->eventDispatcher->dispatch(HelsinkiProfiiliExceptionEvent::EVENT_ID, $event);
+  }
+
+  /**
+   * Dispatches exception event.
+   *
+   * @param string $message
+   *   The message.
+   */
+  private function dispatchOperationEvent(string $message): void {
+    $event = new HelsinkiProfiiliOperationEvent($message);
+    $this->eventDispatcher->dispatch(HelsinkiProfiiliOperationEvent::EVENT_ID, $event);
   }
 
 }
