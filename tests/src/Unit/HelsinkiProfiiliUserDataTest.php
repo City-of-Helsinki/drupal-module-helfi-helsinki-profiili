@@ -6,8 +6,6 @@ namespace Drupal\Tests\helfi_helsinki_profiili\Unit;
 
 use Drupal\Component\EventDispatcher\ContainerAwareEventDispatcher;
 use Drupal\Component\Serialization\Json;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;

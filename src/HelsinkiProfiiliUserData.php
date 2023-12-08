@@ -160,8 +160,6 @@ class HelsinkiProfiiliUserData {
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $eventDispatcher
    *   Dispatch events.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
-   *   Dispatch events.
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   Config factory.
    */
   public function __construct(
@@ -833,7 +831,7 @@ class HelsinkiProfiiliUserData {
   public function refreshTokens() {
     $session = $this->requestStack->getCurrentRequest()->getSession();
     $refresh_token = $session->get('openid_connect_refresh_token');
-    
+
     $plugin_id = $this->requestStack->getCurrentRequest()
       ->getSession()
       ->get('openid_connect_plugin_id');
