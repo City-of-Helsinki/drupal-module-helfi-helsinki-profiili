@@ -66,7 +66,7 @@ class HelsinkiProfiiliUserData {
   /**
    * Request stack for session access.
    *
-   * @var \Drupal\Core\Http\RequestStack
+   * @var \Symfony\Component\HttpFoundation\RequestStack
    */
   protected RequestStack $requestStack;
 
@@ -151,7 +151,7 @@ class HelsinkiProfiiliUserData {
    *   The logger channel factory.
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
    *   Current user session.
-   * @param \Drupal\Core\Http\RequestStack $requestStack
+   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
    *   Access session store.
    * @param \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface $environmentResolver
    *   Where are we?
