@@ -331,7 +331,6 @@ class HelsinkiProfiiliUserData {
     $endpoint = getenv('USERINFO_PROFILE_ENDPOINT');
     // Get query.
     $query = $this->graphqlQuery();
-    $variables = [];
 
     try {
       // Use access token to fetch profiili token from token service.
@@ -354,7 +353,6 @@ class HelsinkiProfiiliUserData {
         'headers' => $headers,
         'json' => [
           'query' => $query,
-          // 'variables' => $variables, // empty variables array breaks things in HP.
         ],
       ]);
       $this->dispatchOperationEvent('PROFILE DATA FETCH');
