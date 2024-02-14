@@ -354,7 +354,7 @@ class HelsinkiProfiiliUserData {
         'headers' => $headers,
         'json' => [
           'query' => $query,
-          'variables' => $variables,
+          // 'variables' => $variables, // empty variables array breaks things in HP.
         ],
       ]);
       $this->dispatchOperationEvent('PROFILE DATA FETCH');
