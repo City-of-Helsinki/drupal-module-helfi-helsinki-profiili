@@ -1,5 +1,11 @@
 # Chanelog
 
+## 0.9.21
+- 7a153cb fix: AU-2146: Remove empty variables (#22)
+- 4f5ea8c Missing files
+- d2418fc feat: AU-1872 Add sub module for audit log (#18)
+- b3e5000 feat: AU-1723: Add support for github testing. (#19)
+
 ## 0.9.18
 - 75c785c feat: AU-1713: Add possibility to map custom roles based email (#17)
 - c454353 feat: AU-1407 testing improvements (#16)
