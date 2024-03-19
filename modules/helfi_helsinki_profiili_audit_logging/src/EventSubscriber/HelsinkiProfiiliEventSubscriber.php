@@ -51,7 +51,7 @@ class HelsinkiProfiiliEventSubscriber implements EventSubscriberInterface {
   /**
    * Audit log the operation.
    *
-   * @param \Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent $event
+   * @param \Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliOperationEvent $event
    *   An exception event.
    */
   public function onOperation(HelsinkiProfiiliOperationEvent $event) {
