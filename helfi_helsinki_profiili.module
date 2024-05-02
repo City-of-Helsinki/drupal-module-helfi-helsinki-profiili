@@ -11,7 +11,9 @@
 
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_helsinki_profiili\ProfileDataException;
+use Drupal\helfi_helsinki_profiili\TokenExpiredException;
 use Drupal\user\UserInterface;
 use GuzzleHttp\Exception\GuzzleException;
 
@@ -115,7 +117,7 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
 
   if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
     try {
-      /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData */
+      /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData $profileDAO */
       $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
       // Set user data from openid.
       $profileDAO->setUserData($context['user_data']);
@@ -141,9 +143,20 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
             ]
                 );
       }
+      catch (TokenExpiredException $e) {
+        \Drupal::messenger()->addError(t('User logged in but fetching tokens failed'));
+        \Drupal::logger('helfi_helsinki_profiili')
+          ->error('API token fetch failed. Error: @error',
+            [
+              '@error' => $e->getMessage(),
+            ]
+          );
+      }
     }
     catch (GuzzleException $e) {
       \Drupal::messenger()->addError(t('User logged in to Helsinki services and data fetch failed'));
+    }
+    catch (TempStoreException $e) {
     }
   }
 

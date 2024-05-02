@@ -8,8 +8,10 @@ use Drupal\Core\Config\Config;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
+use Drupal\grants_handler\ApplicationHandler;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliOperationEvent;
@@ -45,9 +47,9 @@ class HelsinkiProfiiliUserData {
   /**
    * The logger channel factory.
    *
-   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   * @var \Drupal\Core\Logger\LoggerChannelInterface
    */
-  protected $logger;
+  protected LoggerChannelInterface $logger;
 
   /**
    * Cached data that is fetched from external sources.
@@ -94,7 +96,7 @@ class HelsinkiProfiiliUserData {
   /**
    * The entity type manager.
    *
-   * @var \Drupal\helfi_api_base\Environment\EnvironmentResolverInterface
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
    */
   private EntityTypeManagerInterface $entityManager;
 
@@ -136,7 +138,7 @@ class HelsinkiProfiiliUserData {
   /**
    * The event dispatcher service.
    *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
+   * @var \Drupal\Core\Config\Config
    */
   protected Config $config;
 
@@ -171,7 +173,7 @@ class HelsinkiProfiiliUserData {
     EnvironmentResolverInterface $environmentResolver,
     EntityTypeManagerInterface $entityTypeManager,
     EventDispatcherInterface $eventDispatcher,
-    ConfigFactoryInterface $configFactory
+    ConfigFactoryInterface $configFactory,
   ) {
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
@@ -264,12 +266,10 @@ class HelsinkiProfiiliUserData {
   /**
    * Set user data to private store.
    *
-   * @var array $userData
-   *  Userdata retrieved from HP.
-   *
-   * @throws \Drupal\Core\TempStore\TempStoreException
+   * @param array $userData
+   *   Userdata retrieved from HP.
    */
-  public function setUserData($userData) {
+  public function setUserData(array $userData): bool {
     return $this->setToCache('userData', $userData);
   }
 
@@ -279,7 +279,7 @@ class HelsinkiProfiiliUserData {
    * @return array
    *   Userdata from tempstore.
    */
-  public function getUserData() {
+  public function getUserData(): array {
     return $this->getTokenData();
   }
 
@@ -290,6 +290,7 @@ class HelsinkiProfiiliUserData {
    *   Accesstokens or null.
    *
    * @throws \Drupal\helfi_helsinki_profiili\TokenExpiredException
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
   public function getApiAccessTokens(): ?array {
     // Access token to get api access tokens in next step.
@@ -322,9 +323,8 @@ class HelsinkiProfiiliUserData {
       return NULL;
     }
 
-    if ($refetch == FALSE && $this->isCached('myProfile')) {
-      $myProfile = $this->getFromCache('myProfile');
-      return $myProfile;
+    if (!$refetch && $this->isCached('myProfile')) {
+      return $this->getFromCache('myProfile');
     }
 
     // End point to access profile data.
@@ -340,8 +340,8 @@ class HelsinkiProfiiliUserData {
         'Content-Type' => 'application/json',
       ];
       // Use api access token if set, if not, return NULL.
-      if (isset($apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'])) {
-        $headers['Authorization'] = 'Bearer ' . $apiAccessToken['https://api.hel.fi/auth/helsinkiprofile'];
+      if (isset($apiAccessToken['access_token'])) {
+        $headers['Authorization'] = 'Bearer ' . $apiAccessToken["access_token"];
       }
       else {
         // No point going further if no token is received.
@@ -424,6 +424,33 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
+   * Get query params for profile token.
+   *
+   * Dev/test use api-test, others per env.
+   *
+   * @return string[]
+   *   String array containing token parameters.
+   */
+  private function getProfileTokenParams(): array {
+    $appEnv = ApplicationHandler::getAppEnv();
+
+    $endpointAudience = 'profile-api-test';
+
+    if ($appEnv === 'PROD') {
+      $endpointAudience = 'profile-api';
+    }
+    if ($appEnv === 'STAGE') {
+      $endpointAudience = 'profile-api-stage';
+    }
+
+    return [
+      'audience' => $endpointAudience,
+      'grant_type' => 'urn:ietf:params:oauth:grant-type:uma-ticket',
+      'permission' => '#access',
+    ];
+  }
+
+  /**
    * Fetch proper tokens from api-tokens endopoint.
    *
    * @param string $accessToken
@@ -436,10 +463,13 @@ class HelsinkiProfiiliUserData {
    */
   private function getHelsinkiProfiiliToken(string $accessToken): ?array {
     try {
-      $response = $this->httpClient->request('GET', $this->getApiTokenEndpoint(), [
+      $oid_config = $this->getOpenIdConfiguration();
+
+      $response = $this->httpClient->request('POST', $oid_config["token_endpoint"], [
         'headers' => [
           'Authorization' => 'Bearer ' . $accessToken,
         ],
+        'form_params' => $this->getProfileTokenParams(),
       ]);
       $body = $response->getBody()->getContents();
 
@@ -802,7 +832,7 @@ class HelsinkiProfiiliUserData {
     return Json::decode(
       $this->httpClient->request(
         'GET',
-        sprintf('%s/openid/.well-known/openid-configuration/', getenv('TUNNISTAMO_ENVIRONMENT_URL'))
+        sprintf('%s/.well-known/openid-configuration/', $this->getTunnistamoEnvUrl())
       )->getBody()
     );
   }
@@ -824,9 +854,16 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-   * {@inheritdoc}
+   * Refresh tokens.
+   *
+   * @return false|array
+   *   Tokens or false.
+   *
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   * @throws \GuzzleHttp\Exception\GuzzleException
    */
-  public function refreshTokens() {
+  public function refreshTokens(): false|array {
     $session = $this->requestStack->getCurrentRequest()->getSession();
     $refresh_token = $session->get('openid_connect_refresh_token');
 
@@ -844,6 +881,7 @@ class HelsinkiProfiiliUserData {
       return FALSE;
     }
 
+    /** @var \Drupal\helfi_tunnistamo\Plugin\OpenIDConnectClient\Tunnistamo $client */
     $client = $entities[$plugin_id];
     $configuration = $client->getPlugin()->getConfiguration();
 
@@ -991,6 +1029,16 @@ class HelsinkiProfiiliUserData {
   private function dispatchOperationEvent(string $message): void {
     $event = new HelsinkiProfiiliOperationEvent($message);
     $this->eventDispatcher->dispatch($event, HelsinkiProfiiliOperationEvent::EVENT_ID);
+  }
+
+  /**
+   * Get tunnistamo env url from env variable.
+   *
+   * @return string
+   *   The url or false.
+   */
+  public function getTunnistamoEnvUrl(): string {
+    return getenv('TUNNISTAMO_ENVIRONMENT_URL');
   }
 
 }

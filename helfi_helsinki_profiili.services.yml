@@ -21,6 +21,9 @@ services:
 
   helfi_helsinki_profiili.token_event_subscriber:
     class: Drupal\helfi_helsinki_profiili\EventSubscriber\TokenExpiredExceptionSubscriber
-    arguments: ['@messenger']
+    arguments: [
+      '@messenger',
+      '@helfi_audit_log.audit_log'
+    ]
     tags:
       - { name: event_subscriber }

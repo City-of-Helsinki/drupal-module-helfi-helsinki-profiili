@@ -16,8 +16,10 @@ class HelsinkiProfiiliEventSubscriber implements EventSubscriberInterface {
    * {@inheritdoc}
    */
   public function __construct(
-    private AuditLogService $auditLogService
-  ) {}
+    private readonly AuditLogService $auditLogService,
+  ) {
+
+  }
 
   /**
    * {@inheritdoc}
