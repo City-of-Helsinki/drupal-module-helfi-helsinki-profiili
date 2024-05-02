@@ -1034,8 +1034,8 @@ class HelsinkiProfiiliUserData {
   /**
    * Get tunnistamo env url from env variable.
    *
-   * @return string q
-   *  The url or false.
+   * @return string
+   *   The url or false.
    */
   public function getTunnistamoEnvUrl(): string {
     return getenv('TUNNISTAMO_ENVIRONMENT_URL');
