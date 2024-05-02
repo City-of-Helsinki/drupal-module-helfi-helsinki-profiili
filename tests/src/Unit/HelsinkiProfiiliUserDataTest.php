@@ -8,7 +8,7 @@ use Drupal\Component\EventDispatcher\ContainerAwareEventDispatcher;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Http\RequestStack;
-use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Logger\LoggerChannelFactory;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData;
@@ -39,7 +39,7 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
     $service = new HelsinkiProfiiliUserData(
       $this->prophesize(OpenIDConnectSession::class)->reveal(),
       $this->prophesize(ClientInterface::class)->reveal(),
-      $this->prophesize(LoggerChannelFactoryInterface::class)->reveal(),
+      $this->prophesize(LoggerChannelFactory::class)->reveal(),
       $this->prophesize(AccountProxyInterface::class)->reveal(),
       $this->prophesize(RequestStack::class)->reveal(),
       $this->prophesize(EnvironmentResolverInterface::class)->reveal(),
