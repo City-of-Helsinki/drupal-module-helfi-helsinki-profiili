@@ -36,7 +36,7 @@ class HelsinkiProfiiliExceptionEventSubscriber implements EventSubscriberInterfa
    */
   public function __construct(
     MessengerInterface $messenger,
-    AuditLogService $auditLogService
+    AuditLogService $auditLogService,
   ) {
     $this->messenger = $messenger;
     $this->auditLogService = $auditLogService;

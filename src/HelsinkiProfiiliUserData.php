@@ -173,7 +173,7 @@ class HelsinkiProfiiliUserData {
     EnvironmentResolverInterface $environmentResolver,
     EntityTypeManagerInterface $entityTypeManager,
     EventDispatcherInterface $eventDispatcher,
-    ConfigFactoryInterface $configFactory
+    ConfigFactoryInterface $configFactory,
   ) {
     $this->openidConnectSession = $openid_connect_session;
     $this->httpClient = $http_client;
