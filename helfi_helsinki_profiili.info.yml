@@ -5,7 +5,6 @@ package: Hel.fi
 core_version_requirement: ^9 || ^10
 dependencies:
   - helfi_tunnistamo
-  - helfi_audit_log
   - openid_connect
 
 'interface translation project': helfi_helsinki_profiili

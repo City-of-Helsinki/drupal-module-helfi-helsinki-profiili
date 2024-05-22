@@ -108,13 +108,6 @@ class HelsinkiProfiiliUserData {
   private array $openIdConfiguration;
 
   /**
-   * Request cache.
-   *
-   * @var array
-   */
-  private array $cachedData = [];
-
-  /**
    * Debug status.
    *
    * @var bool
@@ -136,7 +129,7 @@ class HelsinkiProfiiliUserData {
   protected EventDispatcherInterface $eventDispatcher;
 
   /**
-   * The event dispatcher service.
+   * The module config.
    *
    * @var \Drupal\Core\Config\Config
    */
