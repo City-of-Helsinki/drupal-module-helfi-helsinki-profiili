@@ -7,8 +7,8 @@ namespace Drupal\Tests\helfi_helsinki_profiili\Unit;
 use Drupal\Component\EventDispatcher\ContainerAwareEventDispatcher;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Http\RequestStack;
 use Drupal\Core\Logger\LoggerChannelFactory;
+use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData;
@@ -16,6 +16,7 @@ use Drupal\openid_connect\OpenIDConnectSession;
 use Drupal\Tests\UnitTestCase;
 use GuzzleHttp\ClientInterface;
 use Prophecy\PhpUnit\ProphecyTrait;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Tests HelsinkiProfiiliUserData class.
@@ -35,11 +36,12 @@ class HelsinkiProfiiliUserDataTest extends UnitTestCase {
     $configFactory = $this->getConfigFactoryStub([
       'helfi_helsinki_profiili.settings' => ['roles' => []],
     ]);
-
+    $loggerFactoryProphecy = $this->prophesize(LoggerChannelFactory::class);
+    $loggerFactoryProphecy->get('helsinki_profiili')->willReturn($this->prophesize(LoggerChannelInterface::class));
     $service = new HelsinkiProfiiliUserData(
       $this->prophesize(OpenIDConnectSession::class)->reveal(),
       $this->prophesize(ClientInterface::class)->reveal(),
-      $this->prophesize(LoggerChannelFactory::class)->reveal(),
+      $loggerFactoryProphecy->reveal(),
       $this->prophesize(AccountProxyInterface::class)->reveal(),
       $this->prophesize(RequestStack::class)->reveal(),
       $this->prophesize(EnvironmentResolverInterface::class)->reveal(),
