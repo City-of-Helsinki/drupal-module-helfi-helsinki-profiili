@@ -28,6 +28,6 @@ TUNNISTAMO_API_TOKEN_ENDPOINT -> endpoint uri to /api-tokens endpoint
 
 ## Tests
 
-This module has unit and kernel tests. You need to have this module inside a working drupal installation.
+This module has unit tests. You need to have this module inside a working drupal installation.
 
 Command to run the tests: ```vendor/bin/phpunit public/modules/contrib/helfi_helsinki_profiili```
