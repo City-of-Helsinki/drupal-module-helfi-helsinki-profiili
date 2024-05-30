@@ -86,21 +86,6 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
         fn(string $rid) => $account->addRole($rid),
         $rolesConfig["admin_user_roles"]
       );
-      if (isset($context["user_data"]["ad_groups"]) && !empty($context["user_data"]["ad_groups"])) {
-        // Get ad groups from config.
-        $adRoleMappings = $config->get('ad_role_mappings');
-        // Add mapped roles for users' ad groups.
-        array_map(
-          function ($adGroup) use ($account, $adRoleMappings) {
-            array_map(
-              fn(string $rid) => $account->addRole($rid),
-              $adRoleMappings[$adGroup] ?? []
-            );
-          },
-          $context["user_data"]["ad_groups"]
-        );
-      }
-
       // Add roles based on the email.
       if ($context['user_data']['email'] && $emailRoleMappings[$context['user_data']['email']]) {
         $customRoles = $emailRoleMappings[$context['user_data']['email']];
