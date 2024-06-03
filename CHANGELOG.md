@@ -1,5 +1,13 @@
 # Chanelog
 
+## 0.9.26
+- 556cccd feat: AU-1892: Tunnistamo AD roles (#30)
+- aa6ca80 fix: AU-2513 Remove unnecessary code and fix comments (#29)
+- b098720 fix: AU-1984: Tunnistamo to version 3 (#28)
+- 944c460 update PR-template, add documentation and translations section
+- 69c0814 fix: AU-2123: Update version constrains for D10, run PHPCS fixes. (#25)
+- 69cc7a1 fix: AU-2123: Drupal 10 compatibility update (#24)
+
 ## 0.9.21
 - 7a153cb fix: AU-2146: Remove empty variables (#22)
 - 4f5ea8c Missing files
