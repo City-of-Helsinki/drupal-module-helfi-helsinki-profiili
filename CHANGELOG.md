@@ -8,6 +8,13 @@
 - 69c0814 fix: AU-2123: Update version constrains for D10, run PHPCS fixes. (#25)
 - 69cc7a1 fix: AU-2123: Drupal 10 compatibility update (#24)
 
+## 0.9.24
+- b098720 fix: AU-1984: Tunnistamo to version 3 (#28)
+- b1a9d6d Bump version number (#26)
+- 944c460 update PR-template, add documentation and translations section
+- 69c0814 AU-2123: Update version constrains for D10, run PHPCS fixes. (#25)
+- 69cc7a1 AU-2123: Drupal 10 compatibility update (#24)
+
 ## 0.9.21
 - 7a153cb fix: AU-2146: Remove empty variables (#22)
 - 4f5ea8c Missing files
