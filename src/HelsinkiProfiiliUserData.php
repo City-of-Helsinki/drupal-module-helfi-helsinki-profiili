@@ -11,7 +11,6 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
-use Drupal\grants_handler\ApplicationHandler;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliOperationEvent;
@@ -134,6 +133,13 @@ class HelsinkiProfiiliUserData {
    * @var \Drupal\Core\Config\Config
    */
   protected Config $config;
+
+    /**
+   * Application environment.
+   *
+   * @var string
+   */
+  private static string $appEnv;
 
   /**
    * Constructs a HelsinkiProfiiliUser object.
@@ -416,6 +422,47 @@ class HelsinkiProfiiliUserData {
     return NULL;
   }
 
+  
+  /**
+   * Return Application environment shortcode.
+   *
+   * If environment is one of the set ones, use those. But if not, use one in
+   * .env file.
+   *
+   * @return string
+   *   Shortcode from current environment.
+   */
+  public static function getAppEnv(): string {
+    if (isset(self::$appEnv) && !empty(self::$appEnv)) {
+      return self::$appEnv;
+    }
+
+    $appEnv = getenv('APP_ENV');
+
+    if ($appEnv == 'development') {
+      self::$appEnv = 'DEV';
+    }
+    else {
+      if ($appEnv == 'production') {
+        self::$appEnv = 'PROD';
+      }
+      else {
+        if ($appEnv == 'testing') {
+          self::$appEnv = 'TEST';
+        }
+        else {
+          if ($appEnv == 'staging') {
+            self::$appEnv = 'STAGE';
+          }
+          else {
+            self::$appEnv = strtoupper($appEnv);
+          }
+        }
+      }
+    }
+    return self::$appEnv;
+  }
+
   /**
    * Get query params for profile token.
    *
@@ -425,7 +472,7 @@ class HelsinkiProfiiliUserData {
    *   String array containing token parameters.
    */
   private function getProfileTokenParams(): array {
-    $appEnv = ApplicationHandler::getAppEnv();
+    $appEnv = self::getAppEnv();
 
     $endpointAudience = 'profile-api-test';
 
