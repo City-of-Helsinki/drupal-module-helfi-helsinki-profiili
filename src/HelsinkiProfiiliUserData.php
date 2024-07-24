@@ -134,7 +134,7 @@ class HelsinkiProfiiliUserData {
    */
   protected Config $config;
 
-    /**
+  /**
    * Application environment.
    *
    * @var string
@@ -422,7 +422,6 @@ class HelsinkiProfiiliUserData {
     return NULL;
   }
 
-  
   /**
    * Return Application environment shortcode.
    *
