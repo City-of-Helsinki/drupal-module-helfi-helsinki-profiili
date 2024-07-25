@@ -423,46 +423,6 @@ class HelsinkiProfiiliUserData {
   }
 
   /**
-   * Return Application environment shortcode.
-   *
-   * If environment is one of the set ones, use those. But if not, use one in
-   * .env file.
-   *
-   * @return string
-   *   Shortcode from current environment.
-   */
-  public static function getAppEnv(): string {
-    if (isset(self::$appEnv) && !empty(self::$appEnv)) {
-      return self::$appEnv;
-    }
-
-    $appEnv = getenv('APP_ENV');
-
-    if ($appEnv == 'development') {
-      self::$appEnv = 'DEV';
-    }
-    else {
-      if ($appEnv == 'production') {
-        self::$appEnv = 'PROD';
-      }
-      else {
-        if ($appEnv == 'testing') {
-          self::$appEnv = 'TEST';
-        }
-        else {
-          if ($appEnv == 'staging') {
-            self::$appEnv = 'STAGE';
-          }
-          else {
-            self::$appEnv = strtoupper($appEnv);
-          }
-        }
-      }
-    }
-    return self::$appEnv;
-  }
-
-  /**
    * Get query params for profile token.
    *
    * Dev/test use api-test, others per env.
@@ -471,17 +431,17 @@ class HelsinkiProfiiliUserData {
    *   String array containing token parameters.
    */
   private function getProfileTokenParams(): array {
-    $appEnv = self::getAppEnv();
-
+    $appEnv = $this->environmentResolver->getActiveEnvironmentName();
+  
     $endpointAudience = 'profile-api-test';
-
-    if ($appEnv === 'PROD') {
+  
+    if ($appEnv === \Drupal\helfi_api_base\Environment\EnvironmentEnum::Prod->value) {
       $endpointAudience = 'profile-api';
     }
-    if ($appEnv === 'STAGE') {
+    if ($appEnv === \Drupal\helfi_api_base\Environment\EnvironmentEnum::Stage->value) {
       $endpointAudience = 'profile-api-stage';
     }
-
+  
     return [
       'audience' => $endpointAudience,
       'grant_type' => 'urn:ietf:params:oauth:grant-type:uma-ticket',
