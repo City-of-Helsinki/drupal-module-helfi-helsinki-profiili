@@ -11,7 +11,7 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
-use Drupal\grants_handler\ApplicationHandler;
+use Drupal\helfi_api_base\Environment\EnvironmentEnum;
 use Drupal\helfi_api_base\Environment\EnvironmentResolverInterface;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliExceptionEvent;
 use Drupal\helfi_helsinki_profiili\Event\HelsinkiProfiiliOperationEvent;
@@ -50,13 +50,6 @@ class HelsinkiProfiiliUserData {
    * @var \Drupal\Core\Logger\LoggerChannelInterface
    */
   protected LoggerChannelInterface $logger;
-
-  /**
-   * Cached data that is fetched from external sources.
-   *
-   * @var array
-   */
-  protected array $userProfileData;
 
   /**
    * Drupal\Core\Session\AccountProxyInterface definition.
@@ -425,14 +418,14 @@ class HelsinkiProfiiliUserData {
    *   String array containing token parameters.
    */
   private function getProfileTokenParams(): array {
-    $appEnv = ApplicationHandler::getAppEnv();
+    $appEnv = $this->environmentResolver->getActiveEnvironmentName();
 
     $endpointAudience = 'profile-api-test';
 
-    if ($appEnv === 'PROD') {
+    if ($appEnv === EnvironmentEnum::Prod->value) {
       $endpointAudience = 'profile-api';
     }
-    if ($appEnv === 'STAGE') {
+    if ($appEnv === EnvironmentEnum::Stage->value) {
       $endpointAudience = 'profile-api-stage';
     }
 
