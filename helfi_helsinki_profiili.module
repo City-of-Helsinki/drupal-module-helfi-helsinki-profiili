@@ -9,7 +9,6 @@
  * @see https://www.drupal.org/node/2217931
  */
 
-use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TempStore\TempStoreException;
 use Drupal\helfi_helsinki_profiili\ProfileDataException;
@@ -23,7 +22,7 @@ use GuzzleHttp\Exception\GuzzleException;
  * This hook runs after a user has been authorized and claims have been mapped
  * to the user's account.
  *
- * A popular use case for this hook is to saving token and additional identity
+ * A popular use case for this hook is saving token and additional identity
  * provider related information to the user's Drupal session (private temp
  * store).
  *
@@ -36,31 +35,9 @@ use GuzzleHttp\Exception\GuzzleException;
  *   - plugin_id:      The plugin identifier.
  *   - sub:            The remote user identifier.
  *
- * @throws \Drupal\Core\Entity\EntityStorageException
- *
  * @ingroup openid_connect_api
  */
 function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $account, array $context): void {
-
-  // Remove all existing roles.
-  array_map(
-    fn(string $rid) => $account->removeRole($rid),
-    $account->getRoles(FALSE)
-  );
-
-  // Save role deletion.
-  $account->save();
-
-  $config = \Drupal::config('helfi_helsinki_profiili.settings');
-  $rolesConfig = $config->get('roles');
-  $clientsConfig = $config->get('clients');
-  $emailRoleConfig = $config->get('email_role_mappings');
-
-  $emailRoleMappings = [];
-  foreach ($emailRoleConfig as $emailRolemap) {
-    $emailRoleMappings[$emailRolemap['user']] = $emailRolemap['roles'];
-  }
-
   $session = \Drupal::request()->getSession();
   $session->set('openid_connect_plugin_id', $context["plugin_id"]);
   if (isset($context['tokens']['refresh_token'])) {
@@ -68,39 +45,7 @@ function helfi_helsinki_profiili_openid_connect_post_authorize(UserInterface $ac
     $session->set('openid_connect_expire', $context['tokens']['expire']);
   }
 
-  try {
-    if ($context["plugin_id"] == $clientsConfig["hp_user_client"]) {
-      // Add strong auth for strong auth and weak for other.
-      // @todo this will need to change when we actually see what the difference here is.
-      if ($context["user_data"]["loa"] == 'substantial') {
-        $account->addRole($rolesConfig["hp_user_role_strong"]);
-      }
-      else {
-        $account->addRole($rolesConfig["hp_user_role_weak"]);
-      }
-    }
-    // User has used admin client for logging in.
-    elseif ($context["plugin_id"] == $clientsConfig["hp_admin_client"]) {
-      // Add admin roles for admin client logins.
-      array_map(
-        fn(string $rid) => $account->addRole($rid),
-        $rolesConfig["admin_user_roles"]
-      );
-      // Add roles based on the email.
-      if ($context['user_data']['email'] && $emailRoleMappings[$context['user_data']['email']]) {
-        $customRoles = $emailRoleMappings[$context['user_data']['email']];
-        foreach ($customRoles as $customRole) {
-          $account->addRole($customRole);
-        }
-      }
-    }
-
-    $account->save();
-  }
-  catch (EntityStorageException $e) {
-  }
-
-  if (!isset($context["user_data"]["ad_groups"]) || empty($context["user_data"]["ad_groups"])) {
+  if (empty($context["user_data"]["ad_groups"])) {
     try {
       /** @var Drupal\helfi_helsinki_profiili\HelsinkiProfiiliUserData $profileDAO */
       $profileDAO = \Drupal::service('helfi_helsinki_profiili.userdata');
