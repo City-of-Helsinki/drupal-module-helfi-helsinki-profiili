@@ -3,11 +3,6 @@
     "type": "drupal-module",
     "license": "GPL-2.0-or-later",
     "minimum-stability": "dev",
-    "autoload": {
-        "psr-4": {
-            "Drupal\\HelfiHelsinkiProfiili\\": "src/"
-        }
-    },
     "extra": {
         "composer-exit-on-patch-failure": true,
         "enable-patching": true,
@@ -21,19 +16,5 @@
         "firebase/php-jwt": "^6.3",
         "drupal/helfi_tunnistamo": "^3.0.9",
         "drupal/helfi_audit_log": "^0.9"
-    },
-    "repositories": [
-        {
-            "type": "composer",
-            "url": "https://repository.drupal.hel.ninja"
-        },
-        {
-            "type": "composer",
-            "url": "https://packages.drupal.org/8"
-        },
-        {
-            "type": "composer",
-            "url": "https://asset-packagist.org"
-        }
-    ]
+    }
 }
